@@ -1,0 +1,1202 @@
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EQUATIONAL THEORIES PLAYGROUND — styles.css
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * ORGANISATION
+ * ────────────
+ *  1.  CSS Custom Properties (design tokens — colours, spacing, fonts)
+ *  2.  CSS Reset / Base styles
+ *  3.  Layout  (app-shell, header, main two-column grid, footer)
+ *  4.  Panel Cards (the bordered box containers)
+ *  5.  Typography helpers (panel titles, hints, …)
+ *  6.  Form controls (label, input, select, textarea, slider, toggle)
+ *  7.  Buttons
+ *  8.  Byte counter & progress bar
+ *  9.  Drop-zone (CSV file upload target)
+ * 10.  Status badge (IDLE / RUNNING / DONE)
+ * 11.  Metric cards + SVG rings
+ * 12.  Score interpretation banner
+ * 13.  Results table
+ * 14.  Evaluation progress bar
+ * 15.  Animations & keyframes
+ * 16.  Scrollbar styling
+ * 17.  Responsive overrides
+ *
+ * DESIGN LANGUAGE
+ * ───────────────
+ * • Dark terminal / maths textbook aesthetic
+ * • Monospace type for equations; Inter for UI chrome
+ * • Cyan/green glow accents on interactive elements
+ * • Subtle scan-line texture via CSS gradient on body
+ * • Grid-heavy, information-dense layout
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1. CSS CUSTOM PROPERTIES (design tokens)
+   ══════════════════════════════════════════════════════════════════════════
+
+   Centralising colours, radii, and shadows here means:
+   • One place to change the whole theme
+   • Variables are descriptive so they act as documentation
+*/
+:root {
+  /* ── Base palette ── */
+  --clr-bg-void:       #050810;   /* deepest background */
+  --clr-bg-panel:      #0c1021;   /* card/panel background */
+  --clr-bg-input:      #0a0e1a;   /* text inputs */
+  --clr-bg-hover:      #131829;   /* hover states */
+  --clr-bg-table-row:  #090d1c;   /* alternating table row */
+
+  /* ── Borders & separators ── */
+  --clr-border:        #1a2340;   /* default panel border */
+  --clr-border-focus:  #00ffe0;   /* focused input ring */
+  --clr-border-accent: #1e3a5f;   /* subtle accent borders */
+
+  /* ── Accent colours (glow palette) ── */
+  --clr-cyan:          #00ffe0;   /* primary accent — cyan */
+  --clr-cyan-dim:      #00ffe055; /* transparent version for glow */
+  --clr-green:         #39ff14;   /* correct answers / success */
+  --clr-red:           #ff4466;   /* errors / wrong answers */
+  --clr-amber:         #ffb347;   /* hard difficulty */
+  --clr-purple:        #a78bfa;   /* normal difficulty ring */
+  --clr-blue:          #38bdf8;   /* overall ring colour */
+
+  /* ── Text colours ── */
+  --clr-text-primary:  #e2e8f8;   /* main readable text */
+  --clr-text-secondary:#7a8aaa;   /* labels, hints */
+  --clr-text-muted:    #3d4f72;   /* very quiet text */
+  --clr-text-code:     #a8d5ff;   /* monospace code text */
+
+  /* ── Typography ── */
+  --font-ui:    'Inter', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ── Sizing & spacing ── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+
+  --panel-gap:   16px;   /* gap between grid cells */
+  --card-pad:    20px;   /* internal padding of each panel card */
+
+  /* ── Drop-shadow / glow effects ── */
+  --shadow-panel: 0 4px 32px rgba(0,0,0,0.6);
+  --glow-cyan:    0 0 12px rgba(0,255,224,0.25);
+  --glow-green:   0 0 10px rgba(57,255,20,0.30);
+  --glow-red:     0 0 10px rgba(255,68,102,0.30);
+
+  /* ── Transitions ── */
+  --transition-fast: 0.15s ease;
+  --transition-med:  0.25s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2. CSS RESET / BASE STYLES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Box-sizing: makes width/height reliable by including padding & border. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 14px;   /* base size — all rem units are relative to this */
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-ui);
+  background-color: var(--clr-bg-void);
+  color: var(--clr-text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+
+  /*
+   * Subtle scan-line texture: alternating transparent bands every 4px.
+   * This adds depth without a heavy image asset.
+   */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,255,224,0.015) 0px,
+      rgba(0,255,224,0.015) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+}
+
+/* ── Utility: visually hidden but accessible to screen readers ── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Utility: hide element completely ── */
+.hidden {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3. LAYOUT
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Outermost wrapper ── */
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+
+/* ── HEADER ── */
+#header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--clr-border);
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* Decorative mathematical glyph */
+.header-glyph {
+  font-size: 2.8rem;
+  font-family: var(--font-mono);
+  color: var(--clr-cyan);
+  text-shadow: var(--glow-cyan);
+  line-height: 1;
+  flex-shrink: 0;
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+.header-text {
+  flex: 1;
+}
+
+#page-title {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--clr-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 0.04em;
+}
+
+.header-subtitle {
+  font-size: 0.82rem;
+  color: var(--clr-text-secondary);
+  margin-top: 2px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── MAIN TWO-COLUMN GRID ── */
+#main-layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: var(--panel-gap);
+  flex: 1;
+  align-items: start;
+}
+
+/* The panels themselves stack their child cards vertically */
+#left-panel,
+#right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+
+/* ── FOOTER ── */
+#footer {
+  border-top: 1px solid var(--clr-border);
+  margin-top: 24px;
+  padding-top: 12px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+#footer a {
+  color: var(--clr-text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+#footer a:hover { color: var(--clr-cyan); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4. PANEL CARDS
+   These are the bordered boxes that group related controls.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.panel-card {
+  background: var(--clr-bg-panel);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  padding: var(--card-pad);
+  box-shadow: var(--shadow-panel);
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--transition-med);
+}
+
+/* Top-edge accent line — gives each card a glowing top border */
+.panel-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--clr-cyan-dim) 30%,
+    var(--clr-cyan-dim) 70%,
+    transparent 100%
+  );
+}
+
+.panel-card:hover {
+  border-color: var(--clr-border-accent);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5. TYPOGRAPHY HELPERS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Section heading inside a card */
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--clr-cyan);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-icon {
+  font-size: 1rem;
+}
+
+/* Small explanatory text below inputs */
+.form-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--clr-text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* Problems-loaded status line */
+.problems-status {
+  font-size: 0.78rem;
+  color: var(--clr-text-secondary);
+  margin-top: 8px;
+  font-family: var(--font-mono);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6. FORM CONTROLS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--clr-text-secondary);
+  margin-bottom: 5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Text inputs & number inputs ── */
+.form-input {
+  width: 100%;
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  color: var(--clr-text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.form-input:focus {
+  border-color: var(--clr-border-focus);
+  box-shadow: 0 0 0 2px var(--clr-cyan-dim);
+}
+
+/* ── Select dropdowns ── */
+.form-select {
+  width: 100%;
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  color: var(--clr-text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 8px 30px 8px 10px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  /* Custom dropdown arrow using SVG data URI */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8aaa'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color var(--transition-fast);
+}
+
+.form-select:focus {
+  border-color: var(--clr-border-focus);
+  box-shadow: 0 0 0 2px var(--clr-cyan-dim);
+}
+
+.form-select option {
+  background: var(--clr-bg-panel);
+  color: var(--clr-text-primary);
+}
+
+/* ── Textareas (cheatsheet and CSV paste) ── */
+.code-textarea {
+  width: 100%;
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  color: var(--clr-text-code);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  tab-size: 2;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.code-textarea:focus {
+  border-color: var(--clr-border-focus);
+  box-shadow: 0 0 0 2px var(--clr-cyan-dim);
+}
+
+.code-textarea::placeholder {
+  color: var(--clr-text-muted);
+  font-style: italic;
+}
+
+/* ── Row layout for two related form groups side-by-side ── */
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+/* ── Range slider ── */
+.form-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--clr-border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+/* Filled portion of the slider track */
+.form-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--clr-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--clr-cyan-dim);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.form-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px var(--clr-cyan);
+  transform: scale(1.15);
+}
+
+.form-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--clr-cyan);
+  cursor: pointer;
+}
+
+/* The numeric tick labels below the slider */
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--clr-text-muted);
+  margin-top: 4px;
+  padding: 0 2px;
+  font-family: var(--font-mono);
+}
+
+/* The live numeric value next to the slider label */
+.slider-value {
+  display: inline-block;
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  color: var(--clr-cyan);
+  font-weight: 700;
+  min-width: 22px;
+  text-align: center;
+}
+
+/* ── Toggle switch (CSS-only, powered by a hidden checkbox) ── */
+.toggle-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--clr-text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Hide the native checkbox */
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+/* The visible track */
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--clr-border);
+  border-radius: 12px;
+  transition: background var(--transition-fast);
+}
+
+/* The moving knob */
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  background: var(--clr-text-secondary);
+  border-radius: 50%;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+/* Checked state: move knob right, light up track */
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--clr-cyan-dim);
+  border: 1px solid var(--clr-cyan);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+  background: var(--clr-cyan);
+  box-shadow: 0 0 6px var(--clr-cyan);
+}
+
+/* ── API key field wrapper (input + eye button side by side) ── */
+.key-input-wrapper {
+  display: flex;
+  gap: 6px;
+}
+
+.key-input-wrapper .form-input {
+  flex: 1;
+}
+
+/* Small icon-only button (eye toggle) */
+.icon-btn {
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  color: var(--clr-text-secondary);
+  cursor: pointer;
+  padding: 0 10px;
+  font-size: 1rem;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-btn:hover {
+  border-color: var(--clr-cyan);
+  color: var(--clr-cyan);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7. BUTTONS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Variants:
+     .btn-primary   — main action (run)
+     .btn-secondary — secondary action (export, parse)
+     .btn-danger    — destructive / stop action
+     .btn-ghost     — low-prominence (clear)
+*/
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn:active { transform: scale(0.97); }
+
+.btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Primary (Run) ── */
+.btn-primary {
+  background: linear-gradient(135deg, #00ffe0 0%, #0099cc 100%);
+  color: #000;
+  box-shadow: 0 0 16px rgba(0,255,224,0.25);
+}
+
+.btn-primary:not(:disabled):hover {
+  box-shadow: 0 0 24px rgba(0,255,224,0.45);
+}
+
+/* ── Secondary ── */
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--clr-cyan);
+  color: var(--clr-cyan);
+}
+
+.btn-secondary:not(:disabled):hover {
+  background: var(--clr-cyan-dim);
+  box-shadow: var(--glow-cyan);
+}
+
+/* ── Danger (Stop) ── */
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--clr-red);
+  color: var(--clr-red);
+}
+
+.btn-danger:not(:disabled):hover {
+  background: rgba(255,68,102,0.12);
+  box-shadow: var(--glow-red);
+}
+
+/* ── Ghost (Clear) ── */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text-secondary);
+}
+
+.btn-ghost:not(:disabled):hover {
+  border-color: var(--clr-text-secondary);
+  color: var(--clr-text-primary);
+}
+
+/* ── Row of buttons side by side ── */
+.btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8. BYTE COUNTER
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.byte-counter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+/* The current byte number */
+.byte-count {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--clr-cyan);
+  min-width: 3ch;
+  text-align: right;
+  transition: color var(--transition-fast);
+}
+
+/* Changes colour as limit is approached */
+.byte-count.warn  { color: var(--clr-amber); }
+.byte-count.over  { color: var(--clr-red); }
+
+.byte-max {
+  font-size: 0.78rem;
+  color: var(--clr-text-muted);
+}
+
+/* Thin progress track */
+.byte-progress-track {
+  flex: 1;
+  height: 4px;
+  background: var(--clr-border);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+/* Fills left-to-right as bytes increase */
+.byte-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--clr-cyan);
+  border-radius: 2px;
+  transition: width 0.1s linear, background var(--transition-fast);
+}
+
+.byte-progress-fill.warn { background: var(--clr-amber); }
+.byte-progress-fill.over { background: var(--clr-red); }
+
+/* Warning text that appears when limit is exceeded */
+.byte-warning {
+  font-size: 0.75rem;
+  color: var(--clr-red);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9. DROP ZONE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.drop-zone {
+  border: 2px dashed var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+  position: relative;
+  background: var(--clr-bg-input);
+}
+
+.drop-zone:hover,
+.drop-zone:focus,
+.drop-zone.drag-over {
+  border-color: var(--clr-cyan);
+  background: rgba(0,255,224,0.04);
+  box-shadow: 0 0 20px rgba(0,255,224,0.08);
+}
+
+.drop-icon {
+  font-size: 2rem;
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+
+.drop-text {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--clr-text-secondary);
+}
+
+.drop-subtext {
+  font-size: 0.72rem;
+  color: var(--clr-text-muted);
+  margin-top: 2px;
+}
+
+/* The actual <input type="file"> is invisible — we click it via JS */
+.hidden-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+/* ── OR divider between drop zone and textarea ── */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 0.72rem;
+  color: var(--clr-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--clr-border);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10. STATUS BADGE (top-right of header)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* IDLE state — muted */
+.badge-idle {
+  border-color: var(--clr-text-muted);
+  color: var(--clr-text-muted);
+}
+
+/* RUNNING state — cyan pulse */
+.badge-running {
+  border-color: var(--clr-cyan);
+  color: var(--clr-cyan);
+  box-shadow: 0 0 10px rgba(0,255,224,0.2);
+}
+
+/* DONE state — green */
+.badge-done {
+  border-color: var(--clr-green);
+  color: var(--clr-green);
+}
+
+/* ERROR state — red */
+.badge-error {
+  border-color: var(--clr-red);
+  color: var(--clr-red);
+}
+
+/* The animated dot in the badge */
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Running: make the dot pulse */
+.badge-running .badge-dot {
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11. METRIC CARDS + SVG RINGS
+   ══════════════════════════════════════════════════════════════════════════
+
+   Each metric card has:
+   • A large percentage number
+   • A fraction (correct / total)
+   • An SVG circle chart behind it (ring-shaped progress indicator)
+*/
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.metric-card {
+  position: relative;
+  background: var(--clr-bg-input);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 16px 12px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  transition: border-color var(--transition-med);
+}
+
+.metric-card:hover { border-color: var(--clr-border-accent); }
+
+.metric-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--clr-text-secondary);
+  font-weight: 600;
+}
+
+/* The big percentage number */
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--clr-cyan);
+  line-height: 1;
+  margin: 4px 0;
+  text-shadow: var(--glow-cyan);
+  transition: color var(--transition-med);
+}
+
+/* "correct / total" fraction below the percentage */
+.metric-fraction {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--clr-text-muted);
+}
+
+/*
+ * The SVG ring:
+ * We position it as an absolute overlay behind the text, at a low opacity.
+ * The ring circumference = 2π × r = 2π × 24 ≈ 150.796.
+ * We represent progress by setting stroke-dasharray to [filled gap].
+ */
+.metric-ring {
+  position: absolute;
+  width: 90px;
+  height: 90px;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* The grey background track circle */
+.ring-track {
+  fill: none;
+  stroke: var(--clr-border);
+  stroke-width: 3;
+}
+
+/* The animated progress arc */
+.ring-fill {
+  fill: none;
+  stroke: var(--clr-blue);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.ring-fill-normal { stroke: var(--clr-purple); }
+.ring-fill-hard   { stroke: var(--clr-amber); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   12. SCORE INTERPRETATION BANNER
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.score-banner {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  text-align: center;
+  transition: all var(--transition-med);
+}
+
+.score-banner.level-below { border-color: var(--clr-red);   color: var(--clr-red);   background: rgba(255,68,102,0.07); }
+.score-banner.level-random { border-color: var(--clr-amber); color: var(--clr-amber); background: rgba(255,179,71,0.07); }
+.score-banner.level-modest { border-color: var(--clr-amber); color: var(--clr-amber); background: rgba(255,179,71,0.07); }
+.score-banner.level-good   { border-color: var(--clr-cyan);  color: var(--clr-cyan);  background: rgba(0,255,224,0.05); }
+.score-banner.level-excel  { border-color: var(--clr-green); color: var(--clr-green); background: rgba(57,255,20,0.07);
+                              box-shadow: var(--glow-green); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   13. RESULTS TABLE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Header row of the results card */
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+/* Scroll container — limits table height so it doesn't push other content */
+.table-scroll-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.results-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--clr-bg-panel);
+  z-index: 2;
+}
+
+.results-table th {
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--clr-text-secondary);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--clr-border);
+  white-space: nowrap;
+}
+
+.results-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(26,35,64,0.5);
+  color: var(--clr-text-secondary);
+  vertical-align: middle;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Alternating row shading for readability */
+.results-table tbody tr:nth-child(even) td {
+  background: var(--clr-bg-table-row);
+}
+
+.results-table tbody tr:hover td {
+  background: var(--clr-bg-hover);
+  color: var(--clr-text-primary);
+}
+
+/* ── per-cell status colours ── */
+
+/* Row number */
+.results-table td:first-child {
+  color: var(--clr-text-muted);
+  width: 36px;
+}
+
+/* Difficulty badge (normal / hard) */
+.diff-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-badge.normal { background: rgba(167,139,250,0.15); color: var(--clr-purple); }
+.diff-badge.hard   { background: rgba(255,179,71,0.15);  color: var(--clr-amber); }
+
+/* Prediction / truth values */
+.pred-true  { color: var(--clr-green); font-weight: 700; }
+.pred-false { color: var(--clr-red);   font-weight: 700; }
+.pred-na    { color: var(--clr-text-muted); }
+
+/* Correct / incorrect indicator */
+.correct-yes { color: var(--clr-green); font-weight: 700; }
+.correct-no  { color: var(--clr-red);   font-weight: 700; }
+.correct-na  { color: var(--clr-text-muted); }
+
+/* Status column */
+.status-pending  { color: var(--clr-text-muted); }
+.status-running  { color: var(--clr-cyan); animation: textBlink 1s step-start infinite; }
+.status-done     { color: var(--clr-green); }
+.status-error    { color: var(--clr-red); }
+.status-skipped  { color: var(--clr-text-muted); font-style: italic; }
+
+/* Empty-state message when no results yet */
+.results-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--clr-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.8;
+}
+
+.results-empty-hint {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   14. EVALUATION PROGRESS BAR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.eval-progress-wrap {
+  margin-top: 14px;
+}
+
+.eval-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--clr-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.eval-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ffe0, #0099cc);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(0,255,224,0.4);
+}
+
+.eval-progress-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--clr-text-secondary);
+  margin-top: 5px;
+  text-align: right;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   15. ANIMATIONS & KEYFRAMES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Slow glow pulse on the header ∀ glyph */
+@keyframes glowPulse {
+  0%, 100% { text-shadow: 0 0 8px var(--clr-cyan-dim); }
+  50%       { text-shadow: 0 0 24px var(--clr-cyan), 0 0 40px rgba(0,255,224,0.15); }
+}
+
+/* Pulsing dot in the running badge */
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* Blinking status text (running rows) */
+@keyframes textBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Fade-in for new table rows */
+@keyframes rowFadeIn {
+  from { opacity: 0; background: rgba(0,255,224,0.06); }
+  to   { opacity: 1; background: transparent; }
+}
+
+.row-new {
+  animation: rowFadeIn 0.5s ease forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   16. SCROLLBAR STYLING (WebKit browsers)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-track    { background: var(--clr-bg-void); }
+::-webkit-scrollbar-thumb    { background: var(--clr-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--clr-text-muted); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   17. RESPONSIVE OVERRIDES
+   ══════════════════════════════════════════════════════════════════════════
+
+   Below 1024px: stack the two columns vertically.
+   Below 640px:  metric cards go single-column.
+*/
+
+@media (max-width: 1024px) {
+  #main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  #page-title {
+    font-size: 1.1rem;
+  }
+
+  .header-glyph {
+    font-size: 2rem;
+  }
+}
