@@ -175,4 +175,21 @@ The 200 hard problems are specifically selected to resist simple heuristics: the
 
 ---
 
+## 9. Evaluation Prompt
+
+Below is a reference Jinja2 evaluation prompt. The final evaluation prompt may include minor adjustments. Jinja2 is a template engine that fills variables (such as equations and cheatsheet text) into a reusable prompt template; official documentation: https://jinja.palletsprojects.com/.
+
+ 
+You are a mathematician specializing in equational theories of magmas. 
+Your task is to determine whether Equation 1 ({{ equation1 }}) implies Equation 2 ({{ equation2 }}) over all magmas.
+{% if cheatsheet is defined and cheatsheet %}
+{{ cheatsheet }}
+{% endif %}
+Output format (use exact headers without any additional text or formatting):
+VERDICT: must be exactly TRUE or FALSE (in the same line).
+REASONING: must be non-empty.
+PROOF: required if VERDICT is TRUE, empty otherwise.
+COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.
+ 
+
 *This specification describes the independent playground implementation. The official competition rules at [competition.sair.foundation](https://competition.sair.foundation) take precedence for submission and scoring purposes. Organized by Damek Davis and Terence Tao, hosted by the SAIR Foundation.*
