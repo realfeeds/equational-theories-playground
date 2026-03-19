@@ -1,531 +1,238 @@
 <!DOCTYPE html>
-<!--
-  ═══════════════════════════════════════════════════════════════════════════
-  EQUATIONAL THEORIES PLAYGROUND — index.html
-  ═══════════════════════════════════════════════════════════════════════════
-
-  PURPOSE
-  ───────
-  This is the HTML skeleton of the app. It defines every section the user
-  sees, but contains almost no logic — all behaviour lives in script.js.
-  Styles come entirely from styles.css.
-
-  PAGE STRUCTURE (top → bottom)
-  ─────────────────────────────
-    <head>            — metadata, font imports, CSS link
-    <body>
-      #app-shell      — full-page wrapper (dark background)
-        #header       — title bar
-        #main-layout  — two-column grid
-          #left-panel
-            #api-section        — API key + provider + model pickers
-            #cheatsheet-section — textarea + byte counter
-            #problems-section   — CSV upload / paste area
-          #right-panel
-            #settings-section   — parallelism slider, run/stop buttons
-            #metrics-section    — live accuracy cards (overall/normal/hard)
-            #results-section    — scrollable results table + CSV export
-
-  WHY SEPARATE FILES?
-  ───────────────────
-  HTML  = "what exists on the page"
-  CSS   = "how it looks"
-  JS    = "what it does"
-  Keeping them separate makes each file shorter, easier to read,
-  and easier to maintain independently.
-
-  ACCESSIBILITY NOTES
-  ───────────────────
-  - aria-live="polite" on the metrics region announces changes to
-    screen readers without interrupting the user.
-  - All interactive elements have explicit <label> tags or aria-label
-    attributes so they are usable without a mouse.
-  ═══════════════════════════════════════════════════════════════════════════
--->
 <html lang="en">
 <head>
-  <!-- ── Character encoding: UTF-8 supports all mathematical symbols ── -->
   <meta charset="UTF-8" />
-
-  <!-- ── Viewport: makes the layout scale correctly on every screen ── -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- ── SEO: descriptive title shown in browser tab and search results ── -->
   <title>Equational Theories Playground · Stage 1 Evaluator</title>
-
-  <!-- ── SEO: meta description for search engines ── -->
-  <meta name="description"
-        content="Evaluate cheatsheets for the SAIR Foundation Mathematics Distillation Challenge. Test equational implication problems against state-of-the-art LLMs with live accuracy tracking." />
-
-  <!-- ── Google Fonts: JetBrains Mono for code/math, Inter for UI text ── -->
+  <meta name="description" content="Evaluate cheatsheets for the SAIR Foundation Mathematics Distillation Challenge. Test equational implication problems against LLMs with live accuracy tracking." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet" />
-
-  <!-- ── Our stylesheet (all visual styling lives here) ── -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
-  <!-- ════════════════════════════════════════════════════════════════════
-       #app-shell — The outermost wrapper. Gives the page its dark
-       background and constrains content width.
-  ════════════════════════════════════════════════════════════════════════ -->
-  <div id="app-shell">
 
-    <!-- ── HEADER ──────────────────────────────────────────────────── -->
-    <header id="header" role="banner">
-      <!-- Decorative glyph that emphasises the mathematical theme -->
-      <div class="header-glyph" aria-hidden="true">∀</div>
+<div id="app-shell">
 
-      <div class="header-text">
-        <!-- Single h1 per page for correct SEO heading hierarchy -->
-        <h1 id="page-title">Equational Theories Playground</h1>
-        <p class="header-subtitle">
-          Mathematics Distillation Challenge · Stage 1 · LLM Evaluator
-        </p>
-      </div>
-
-      <!-- Live status badge (idle / running / done) updated by script.js -->
+  <!-- ── TOP NAV ── -->
+  <nav id="top-nav">
+    <div class="nav-brand">
+      <span class="nav-logo">∀</span>
+      <span class="nav-title">SAIR Playground</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="tab-run" onclick="switchMainTab('run')">Run</button>
+      <button class="nav-tab"         id="tab-history" onclick="switchMainTab('history')">History</button>
+    </div>
+    <div class="nav-right">
       <div id="status-badge" class="badge badge-idle" aria-live="polite">
         <span class="badge-dot"></span>
         <span id="status-text">IDLE</span>
       </div>
-    </header>
+    </div>
+  </nav>
 
-    <!-- ════════════════════════════════════════════════════════════════
-         #main-layout — Two-column grid:
-           left  = inputs (API key, cheatsheet, CSV)
-           right = controls + live results
-    ════════════════════════════════════════════════════════════════════ -->
-    <main id="main-layout" role="main">
+  <div id="layout">
 
-      <!-- ── LEFT PANEL ──────────────────────────────────────────── -->
-      <section id="left-panel" aria-label="Configuration inputs">
+    <!-- ═══════════════════════════════ LEFT SIDEBAR ═══════════════════════════════ -->
+    <aside id="sidebar">
 
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 1: API CONFIGURATION                           │
-             │ The user picks a provider, enters an API key, and      │
-             │ selects the specific model to call.                    │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="api-section">
-          <h2 class="panel-title">
-            <span class="panel-icon" aria-hidden="true">⚡</span>
-            API Configuration
-          </h2>
+      <!-- Cheatsheet -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Cheatsheet</span>
+          <span id="byte-count" class="byte-pill">0 B</span>
+        </div>
+        <textarea
+          id="cheatsheet-textarea"
+          class="sidebar-textarea"
+          rows="7"
+          placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…"
+          spellcheck="false"
+        ></textarea>
+        <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
+        <div class="byte-progress-track" aria-hidden="true">
+          <div id="byte-progress-fill" class="byte-progress-fill"></div>
+        </div>
+      </div>
 
-          <!-- Provider selector -->
-          <div class="form-group">
-            <label for="provider-select" class="form-label">Provider</label>
-            <select id="provider-select" class="form-select" aria-describedby="provider-hint">
-              <!--
-                Each option value is a provider ID used in script.js
-                to look up the correct base URL and auth header format.
-              -->
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="xai">xAI (Grok)</option>
-              <option value="google">Google (Gemini)</option>
-              <option value="meta">Meta (Llama via Together)</option>
-            </select>
-            <span id="provider-hint" class="form-hint">
-              Script uses fetch() directly — no backend needed.
-            </span>
+      <!-- Model -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Model</span>
+        </div>
+        <select id="provider-select" class="sidebar-select" aria-label="Provider">
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="xai">xAI (Grok)</option>
+          <option value="google">Google (Gemini)</option>
+          <option value="meta">Meta (Llama via Together)</option>
+        </select>
+        <select id="model-select" class="sidebar-select" aria-label="Model" style="margin-top:6px"></select>
+        <div class="key-row" style="margin-top:6px">
+          <input type="password" id="api-key-input" class="sidebar-input" placeholder="API key…" autocomplete="off" spellcheck="false" />
+          <button id="toggle-key-btn" class="icon-btn" type="button" aria-label="Show/hide API key" title="Show/hide">👁</button>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Settings</span>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Concurrency</label>
+          <div class="settings-control">
+            <input type="range" id="parallelism-slider" min="1" max="5" value="3" step="1" class="mini-slider" />
+            <span id="parallelism-value" class="settings-val">3</span>
           </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label">Max tokens</label>
+          <input type="number" id="max-tokens-input" class="sidebar-input-sm" value="1024" min="128" max="8192" step="128" />
+        </div>
+        <div class="settings-row">
+          <label class="settings-label toggle-label-inline" for="use-cheatsheet-toggle">Use cheatsheet</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="use-cheatsheet-toggle" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
 
-          <!-- Model selector — options swapped by script.js on provider change -->
-          <div class="form-group">
-            <label for="model-select" class="form-label">Model</label>
-            <select id="model-select" class="form-select">
-              <!-- Populated dynamically by script.js -->
-            </select>
+      <!-- Problems -->
+      <div class="sidebar-section sidebar-problems">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Problems</span>
+          <div class="problems-import-row">
+            <button class="mini-btn" id="import-csv-btn" type="button" title="Import CSV">Import</button>
+            <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden-file-input" aria-hidden="true" tabindex="-1" />
+            <button class="mini-btn ghost" id="clear-problems-btn" type="button">Clear</button>
           </div>
+        </div>
 
-          <!-- API Key input -->
-          <div class="form-group">
-            <label for="api-key-input" class="form-label">API Key</label>
-            <div class="key-input-wrapper">
-              <input
-                type="password"
-                id="api-key-input"
-                class="form-input"
-                placeholder="sk-… or your provider key"
-                autocomplete="off"
-                spellcheck="false"
-                aria-describedby="key-hint"
-              />
-              <!-- Eye button: toggles password visibility -->
-              <button id="toggle-key-btn"
-                      class="icon-btn"
-                      type="button"
-                      aria-label="Show/hide API key"
-                      title="Show/hide API key">
-                👁
-              </button>
-            </div>
-            <span id="key-hint" class="form-hint">
-              Stored only in memory; never sent anywhere except the provider.
-            </span>
+        <div class="search-row">
+          <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
+          <div class="filter-pills" id="filter-pills">
+            <button class="filter-pill active" data-filter="all">all</button>
+            <button class="filter-pill" data-filter="normal">normal</button>
+            <button class="filter-pill" data-filter="hard">hard</button>
           </div>
-        </div><!-- /api-section -->
+        </div>
 
+        <div id="problems-status" class="problems-status">No problems loaded.</div>
 
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 2: CHEATSHEET                                  │
-             │ Users paste their plain-text cheatsheet here.          │
-             │ A live byte counter enforces the 10,240-byte limit.    │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="cheatsheet-section">
-          <h2 class="panel-title">
-            <span class="panel-icon" aria-hidden="true">📄</span>
-            Cheatsheet
-          </h2>
+        <!-- Selectable problem list -->
+        <div id="problem-list" class="problem-list" role="listbox" aria-multiselectable="true" aria-label="Selectable problems">
+          <div class="problem-list-empty">Import all_problems.csv to begin.</div>
+        </div>
 
-          <!-- Byte counter — updates on every keystroke via script.js -->
-          <div class="byte-counter-bar" role="status" aria-live="polite">
-            <span id="byte-count" class="byte-count">0</span>
-            <span class="byte-max"> / 10,240 bytes</span>
-            <!-- Progress bar that fills as the user types -->
-            <div class="byte-progress-track" aria-hidden="true">
-              <div id="byte-progress-fill" class="byte-progress-fill"></div>
-            </div>
+        <!-- Selected summary + controls -->
+        <div id="selected-panel" class="selected-panel hidden">
+          <div class="selected-header">
+            <span id="selected-count" class="selected-count">0 selected</span>
+            <button class="mini-btn ghost" id="clear-sel-btn" type="button">Clear all</button>
+            <button class="mini-btn ghost" id="select-all-btn" type="button">Select all</button>
           </div>
+          <div id="selected-preview" class="selected-preview"></div>
+        </div>
+      </div>
 
-          <!-- The cheatsheet textarea -->
-          <textarea
-            id="cheatsheet-textarea"
-            class="code-textarea"
-            rows="12"
-            placeholder="Paste your plain-text cheatsheet here (max 10,240 bytes).
+      <!-- Run button pinned to bottom of sidebar -->
+      <div class="sidebar-run-row">
+        <button id="stop-btn" class="btn btn-danger" type="button" disabled>■ Stop</button>
+        <button id="run-btn" class="btn btn-primary" type="button" disabled>
+          ▶ Run (<span id="run-count">0</span>)
+        </button>
+      </div>
 
-Example content:
-  e = x * x  (E1, trivial law) is implied by everything
-  x = y      (E2, singleton)   implies everything
-  Commutativity: x*y = y*x
-  Associativity: x*(y*z) = (x*y)*z
+    </aside>
 
-Strategies:
-  TRUE: try to rewrite E2 using E1 as a rewrite rule
-  FALSE: construct a small counterexample magma (2–4 elements)"
-            spellcheck="false"
-            aria-label="Cheatsheet content"
-            aria-describedby="byte-counter-bar"
-          ></textarea>
+    <!-- ═══════════════════════════════ MAIN AREA ═══════════════════════════════ -->
+    <main id="main-area">
 
-          <!-- Warning shown when limit is approached / exceeded -->
-          <div id="byte-warning" class="byte-warning hidden" role="alert">
-            ⚠ Cheatsheet exceeds 10,240 bytes and will be truncated.
-          </div>
-        </div><!-- /cheatsheet-section -->
+      <!-- Stats bar -->
+      <div id="stats-bar">
+        <div class="stat-chip">
+          <div class="stat-value" id="stat-remaining">—</div>
+          <div class="stat-label">criteria left</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-value" id="stat-done-today">—</div>
+          <div class="stat-label">done this run</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-label">total tasks</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-value" id="stat-correct">0</div>
+          <div class="stat-label">correct</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-value" id="stat-accuracy">—%</div>
+          <div class="stat-label">accuracy</div>
+        </div>
+        <div class="stat-spacer"></div>
+        <button class="mini-btn ghost" id="export-csv-btn" type="button" disabled>⬇ Export CSV</button>
+      </div>
 
+      <!-- Progress bar -->
+      <div id="eval-progress-wrap" class="hidden">
+        <div class="eval-progress-track">
+          <div id="eval-progress-fill" class="eval-progress-fill" style="width:0%"></div>
+        </div>
+        <div id="eval-progress-label" class="eval-progress-label">0 / 0</div>
+      </div>
 
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 3: PROBLEMS (CSV)                              │
-             │ Users upload all_problems.csv or paste CSV text.       │
-             │ Required columns: eq1, eq2, difficulty                 │
-             │ Optional column: ground_truth (TRUE/FALSE/blank)       │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="problems-section">
-          <h2 class="panel-title">
-            <span class="panel-icon" aria-hidden="true">📊</span>
-            Problems (CSV)
-          </h2>
+      <!-- Score banner -->
+      <div id="score-banner" class="score-banner hidden">
+        <span id="score-interpretation"></span>
+      </div>
 
-          <!-- File upload drop-zone -->
-          <div id="drop-zone"
-               class="drop-zone"
-               role="button"
-               tabindex="0"
-               aria-label="Drop CSV file here or click to browse"
-               aria-describedby="drop-hint">
-            <div class="drop-icon" aria-hidden="true">📂</div>
-            <p class="drop-text">Drop <code>all_problems.csv</code> here</p>
-            <p class="drop-subtext">or click to browse</p>
-            <!-- Hidden file input triggered by clicking the drop zone -->
-            <input type="file"
-                   id="csv-file-input"
-                   accept=".csv,text/csv"
-                   class="hidden-file-input"
-                   aria-hidden="true"
-                   tabindex="-1" />
-          </div>
+      <!-- Results area: cards -->
+      <div id="results-area">
+        <div id="results-empty" class="results-empty">
+          <div class="results-empty-icon">∀</div>
+          <p>Select problems from the sidebar and press <strong>Run</strong> to start evaluation.</p>
+          <p class="results-empty-hint">Each result will appear here as a card with VERDICT, tokens, cost, and expandable response/prompt.</p>
+        </div>
+        <div id="results-cards"></div>
+      </div>
 
-          <p id="drop-hint" class="form-hint" style="margin-top:8px">
-            Required columns: <code>eq1</code>, <code>eq2</code>,
-            <code>difficulty</code>. Optional: <code>ground_truth</code>.
-          </p>
+    </main>
 
-          <!-- OR divider -->
-          <div class="or-divider" aria-hidden="true">
-            <span>or paste CSV text</span>
-          </div>
+  </div><!-- /layout -->
 
-          <!-- Paste-CSV textarea (alternative to file upload) -->
-          <textarea
-            id="csv-textarea"
-            class="code-textarea"
-            rows="5"
-            placeholder="eq1,eq2,difficulty,ground_truth
-x = x * (y * z),x * y = y * x,normal,TRUE
-x * y = y * x,x = x * (y * z),normal,FALSE"
-            spellcheck="false"
-            aria-label="Paste CSV data"
-          ></textarea>
+</div><!-- /app-shell -->
 
-          <!-- Action buttons for the CSV section -->
-          <div class="btn-row" style="margin-top:10px">
-            <button id="load-csv-btn" class="btn btn-secondary" type="button">
-              Parse CSV
-            </button>
-            <button id="clear-problems-btn" class="btn btn-ghost" type="button">
-              Clear
-            </button>
-          </div>
+<!-- Prompt preview modal -->
+<div id="prompt-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Prompt preview">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Prompt Preview</h3>
+      <button class="modal-close" id="prompt-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre id="prompt-modal-content" class="modal-pre"></pre>
+    </div>
+  </div>
+</div>
 
-          <!-- Status line showing how many problems were loaded -->
-          <div id="problems-status" class="problems-status" role="status" aria-live="polite">
-            No problems loaded.
-          </div>
-        </div><!-- /problems-section -->
+<!-- Raw response modal -->
+<div id="log-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Raw AI output">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="log-modal-title">Raw AI Output</h3>
+      <button class="modal-close" id="log-modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-meta" id="log-modal-meta"></div>
+    <div class="modal-body">
+      <pre id="log-modal-content" class="modal-pre"></pre>
+    </div>
+  </div>
+</div>
 
-      </section><!-- /left-panel -->
-
-
-      <!-- ── RIGHT PANEL ─────────────────────────────────────────── -->
-      <section id="right-panel" aria-label="Evaluation controls and live results">
-
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 4: EVALUATION SETTINGS + RUN CONTROLS         │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="settings-section">
-          <h2 class="panel-title">
-            <span class="panel-icon" aria-hidden="true">⚙</span>
-            Evaluation Settings
-          </h2>
-
-          <!-- ── Problem range selector ── -->
-          <div class="form-row">
-            <div class="form-group" style="flex:1">
-              <label for="range-from" class="form-label">From (problem #)</label>
-              <input type="number" id="range-from" class="form-input" value="1" min="1" />
-            </div>
-            <div class="form-group" style="flex:1">
-              <label for="range-to" class="form-label">To (problem #)</label>
-              <input type="number" id="range-to" class="form-input" value="50" min="1" />
-            </div>
-          </div>
-
-          <!-- ── Parallelism slider ── -->
-          <div class="form-group">
-            <label for="parallelism-slider" class="form-label">
-              Concurrency:
-              <!-- Displays the current value next to the label -->
-              <span id="parallelism-value" class="slider-value">3</span>
-              parallel requests
-            </label>
-            <input
-              type="range"
-              id="parallelism-slider"
-              class="form-slider"
-              min="1"
-              max="5"
-              value="3"
-              step="1"
-              aria-label="Number of concurrent API requests (1 to 5)"
-            />
-            <div class="slider-ticks" aria-hidden="true">
-              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
-            </div>
-          </div>
-
-          <!-- ── Include cheatsheet toggle ── -->
-          <div class="form-group toggle-group">
-            <label class="toggle-label" for="use-cheatsheet-toggle">
-              Prepend cheatsheet to prompt
-            </label>
-            <label class="toggle-switch" aria-label="Toggle cheatsheet">
-              <input type="checkbox"
-                     id="use-cheatsheet-toggle"
-                     checked />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-
-          <!-- ── Max tokens ── -->
-          <div class="form-group">
-            <label for="max-tokens-input" class="form-label">
-              Max tokens per response
-            </label>
-            <input type="number"
-                   id="max-tokens-input"
-                   class="form-input"
-                   value="1024"
-                   min="128"
-                   max="4096"
-                   step="128" />
-          </div>
-
-          <!-- ── Run / Stop buttons ── -->
-          <div class="btn-row" style="margin-top: 16px">
-            <button id="run-btn" class="btn btn-primary" type="button">
-              ▶ Run Evaluation
-            </button>
-            <button id="stop-btn" class="btn btn-danger" type="button" disabled>
-              ■ Stop
-            </button>
-          </div>
-
-          <!-- Progress bar for overall evaluation progress -->
-          <div class="eval-progress-wrap" aria-label="Evaluation progress">
-            <div class="eval-progress-track">
-              <div id="eval-progress-fill" class="eval-progress-fill" style="width:0%"></div>
-            </div>
-            <div id="eval-progress-label" class="eval-progress-label">
-              0 / 0 problems complete
-            </div>
-          </div>
-        </div><!-- /settings-section -->
-
-
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 5: LIVE ACCURACY METRICS                       │
-             │ Three cards: Overall, Normal, Hard                     │
-             │ Updated in real time as results arrive.                │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="metrics-section" aria-live="polite">
-          <h2 class="panel-title">
-            <span class="panel-icon" aria-hidden="true">📈</span>
-            Live Accuracy Metrics
-          </h2>
-
-          <div class="metrics-grid">
-
-            <!-- Overall accuracy card -->
-            <div class="metric-card" id="metric-overall">
-              <div class="metric-label">Overall</div>
-              <div class="metric-value" id="metric-overall-pct">—</div>
-              <div class="metric-fraction" id="metric-overall-frac">0 / 0</div>
-              <!-- Circular progress ring drawn by CSS + JS -->
-              <svg class="metric-ring" viewBox="0 0 60 60" aria-hidden="true">
-                <circle class="ring-track" cx="30" cy="30" r="24"/>
-                <circle class="ring-fill" id="ring-overall"
-                        cx="30" cy="30" r="24"
-                        stroke-dasharray="0 150.796"/>
-              </svg>
-            </div>
-
-            <!-- Normal difficulty card -->
-            <div class="metric-card" id="metric-normal">
-              <div class="metric-label">Normal</div>
-              <div class="metric-value" id="metric-normal-pct">—</div>
-              <div class="metric-fraction" id="metric-normal-frac">0 / 0</div>
-              <svg class="metric-ring" viewBox="0 0 60 60" aria-hidden="true">
-                <circle class="ring-track" cx="30" cy="30" r="24"/>
-                <circle class="ring-fill ring-fill-normal" id="ring-normal"
-                        cx="30" cy="30" r="24"
-                        stroke-dasharray="0 150.796"/>
-              </svg>
-            </div>
-
-            <!-- Hard difficulty card -->
-            <div class="metric-card" id="metric-hard">
-              <div class="metric-label">Hard</div>
-              <div class="metric-value" id="metric-hard-pct">—</div>
-              <div class="metric-fraction" id="metric-hard-frac">0 / 0</div>
-              <svg class="metric-ring" viewBox="0 0 60 60" aria-hidden="true">
-                <circle class="ring-track" cx="30" cy="30" r="24"/>
-                <circle class="ring-fill ring-fill-hard" id="ring-hard"
-                        cx="30" cy="30" r="24"
-                        stroke-dasharray="0 150.796"/>
-              </svg>
-            </div>
-
-          </div><!-- /metrics-grid -->
-
-          <!-- Score interpretation banner — hidden until results exist -->
-          <div id="score-banner" class="score-banner hidden" role="status">
-            <span id="score-interpretation"></span>
-          </div>
-
-        </div><!-- /metrics-section -->
-
-
-        <!-- ┌─────────────────────────────────────────────────────────┐
-             │ SECTION 6: RESULTS TABLE                              │
-             │ Scrollable table with one row per problem.            │
-             │ Columns: #, Eq1, Eq2, Difficulty, Prediction,        │
-             │          Ground Truth, Correct, Status                │
-             └─────────────────────────────────────────────────────────┘ -->
-        <div class="panel-card" id="results-section">
-          <div class="results-header">
-            <h2 class="panel-title" style="margin:0">
-              <span class="panel-icon" aria-hidden="true">🗂</span>
-              Results
-            </h2>
-            <!-- Export button — only active when results exist -->
-            <button id="export-csv-btn"
-                    class="btn btn-secondary"
-                    type="button"
-                    disabled
-                    aria-label="Export results as CSV file">
-              ⬇ Export CSV
-            </button>
-          </div>
-
-          <!-- Scrollable table container -->
-          <div class="table-scroll-wrap" role="region" aria-label="Results table" tabindex="0">
-            <table id="results-table" class="results-table" aria-live="polite">
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Equation 1</th>
-                  <th scope="col">Equation 2</th>
-                  <th scope="col">Diff</th>
-                  <th scope="col">Prediction</th>
-                  <th scope="col">Truth</th>
-                  <th scope="col">✓?</th>
-                  <th scope="col">Status</th>
-                </tr>
-              </thead>
-              <!-- tbody populated dynamically by script.js -->
-              <tbody id="results-tbody">
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Empty state shown before any evaluation -->
-          <div id="results-empty" class="results-empty">
-            <p>Evaluation results will appear here as they arrive.</p>
-            <p class="results-empty-hint">
-              Load a CSV, enter an API key, and press <strong>Run Evaluation</strong>.
-            </p>
-          </div>
-
-        </div><!-- /results-section -->
-
-      </section><!-- /right-panel -->
-
-    </main><!-- /main-layout -->
-
-    <!-- ── FOOTER ──────────────────────────────────────────────────── -->
-    <footer id="footer" role="contentinfo">
-      <p>
-        Equational Theories Playground ·
-        <a href="https://competition.sair.foundation" target="_blank" rel="noopener">
-          SAIR Foundation
-        </a> ·
-        <a href="https://github.com/teorth/equational_theories" target="_blank" rel="noopener">
-          Equational Theories Project
-        </a> ·
-        Organized by Damek Davis &amp; Terence Tao
-      </p>
-    </footer>
-
-  </div><!-- /app-shell -->
-
-  <!-- ── Load our main script (deferred so HTML is parsed first) ── -->
-  <script src="script.js" defer></script>
-
+<script src="script.js" defer></script>
 </body>
 </html>
