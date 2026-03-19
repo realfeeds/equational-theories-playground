@@ -1,269 +1,292 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Equational Theories Playground · Stage 1 Evaluator</title>
-  <meta name="description" content="Evaluate cheatsheets for the SAIR Foundation Mathematics Distillation Challenge. Test equational implication problems against LLMs with live accuracy tracking." />
+  <meta name="description"
+    content="Evaluate cheatsheets for the Equational Theories challenge. Test equational implication problems against LLMs with live accuracy tracking." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body>
 
-<div id="app-shell">
+  <div id="app-shell">
 
-  <!-- ── TOP NAV ── -->
-  <nav id="top-nav">
-    <div class="nav-brand">
-      <span class="nav-logo">∀</span>
-      <span class="nav-title">SAIR Playground</span>
-    </div>
-    <div class="nav-tabs">
-      <button class="nav-tab active" id="tab-run"     onclick="switchMainTab('run')">Run</button>
-      <button class="nav-tab"         id="tab-history" onclick="switchMainTab('history')">History</button>
-    </div>
-    <div class="nav-right">
-      <div id="status-badge" class="badge badge-idle" aria-live="polite">
-        <span class="badge-dot"></span>
-        <span id="status-text">IDLE</span>
+    <!-- ── TOP NAV ── -->
+    <nav id="top-nav">
+      <div class="nav-brand">
+        <span class="nav-logo">∀</span>
+        <span class="nav-title">Equational Theories Playground</span>
+        <span class="nav-version">v1.1.0</span>
       </div>
-    </div>
-  </nav>
-
-  <div id="layout">
-
-    <!-- ════════════════ LEFT SIDEBAR ════════════════ -->
-    <aside id="sidebar">
-
-      <!-- Scrollable content (everything except Run row) -->
-      <div id="sidebar-content">
-
-        <!-- Cheatsheet -->
-        <div class="sidebar-section">
-          <div class="sidebar-section-header">
-            <span class="sidebar-section-title">Cheatsheet</span>
-            <span id="byte-count" class="byte-pill">0 B</span>
-          </div>
-          <textarea
-            id="cheatsheet-textarea"
-            class="sidebar-textarea"
-            rows="6"
-            placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…"
-            spellcheck="false"
-          ></textarea>
-          <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
-          <div class="byte-progress-track" aria-hidden="true">
-            <div id="byte-progress-fill" class="byte-progress-fill"></div>
-          </div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-run" onclick="switchMainTab('run')">Run</button>
+        <button class="nav-tab" id="tab-history" onclick="switchMainTab('history')">History</button>
+      </div>
+      <div class="nav-right">
+        <div id="status-badge" class="badge badge-idle" aria-live="polite">
+          <span class="badge-dot"></span>
+          <span id="status-text">IDLE</span>
         </div>
+      </div>
+    </nav>
 
-        <!-- Model -->
-        <div class="sidebar-section">
-          <div class="sidebar-section-header">
-            <span class="sidebar-section-title">Model</span>
-          </div>
-          <select id="provider-select" class="sidebar-select" aria-label="Provider"></select>
-          <select id="model-select" class="sidebar-select" aria-label="Model" style="margin-top:6px"></select>
-          <div class="key-row" style="margin-top:6px">
-            <input type="password" id="api-key-input" class="sidebar-input" placeholder="API key…" autocomplete="off" spellcheck="false" />
-            <button id="toggle-key-btn" class="icon-btn" type="button" aria-label="Show/hide API key" title="Show/hide">👁</button>
-          </div>
-        </div>
+    <div id="layout">
 
-        <!-- Settings -->
-        <div class="sidebar-section">
-          <div class="sidebar-section-header">
-            <span class="sidebar-section-title">Settings</span>
-          </div>
-          <div class="settings-row">
-            <label class="settings-label">Concurrency</label>
-            <div class="settings-control">
-              <input type="range" id="parallelism-slider" min="1" max="5" value="3" step="1" class="mini-slider" />
-              <span id="parallelism-value" class="settings-val">3</span>
+      <!-- ════════════════ LEFT SIDEBAR ════════════════ -->
+      <aside id="sidebar">
+
+        <!-- Scrollable content (everything except Run row) -->
+        <div id="sidebar-content">
+
+          <!-- Cheatsheet -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span class="sidebar-section-title">Cheatsheet</span>
+              <span id="byte-count" class="byte-pill">0 B</span>
             </div>
-          </div>
-          <div class="settings-row">
-            <label class="settings-label">Max tokens</label>
-            <input type="number" id="max-tokens-input" class="sidebar-input-sm" value="1024" min="128" max="8192" step="128" />
-          </div>
-          <div class="settings-row">
-            <label class="settings-label toggle-label-inline" for="use-cheatsheet-toggle">Use cheatsheet</label>
-            <label class="toggle-switch">
-              <input type="checkbox" id="use-cheatsheet-toggle" checked />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Problems -->
-        <div class="sidebar-section sidebar-problems">
-          <div class="sidebar-section-header">
-            <span class="sidebar-section-title">Problems</span>
-            <div class="problems-import-row">
-              <button class="mini-btn" id="import-csv-btn" type="button">Import CSV</button>
-              <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden-file-input" aria-hidden="true" tabindex="-1" />
-              <button class="mini-btn ghost" id="clear-problems-btn" type="button">Clear</button>
+            <textarea id="cheatsheet-textarea" class="sidebar-textarea" rows="6"
+              placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…" spellcheck="false"></textarea>
+            <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
+            <div class="byte-progress-track" aria-hidden="true">
+              <div id="byte-progress-fill" class="byte-progress-fill"></div>
             </div>
           </div>
 
-          <div class="search-row">
-            <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
-            <div class="filter-pills" id="filter-pills">
-              <button class="filter-pill active" data-filter="all">all</button>
-              <button class="filter-pill" data-filter="normal">normal</button>
-              <button class="filter-pill" data-filter="hard">hard</button>
+          <!-- Model -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span class="sidebar-section-title">Model</span>
+            </div>
+            <select id="provider-select" class="sidebar-select" aria-label="Provider"></select>
+            <select id="model-select" class="sidebar-select" aria-label="Model" style="margin-top:6px"></select>
+            <div class="key-row" style="margin-top:6px">
+              <input type="password" id="api-key-input" class="sidebar-input" placeholder="API key…" autocomplete="off"
+                spellcheck="false" />
+              <button id="toggle-key-btn" class="icon-btn" type="button" aria-label="Show/hide API key"
+                title="Show/hide">👁</button>
+            </div>
+            <!-- Saved API keys -->
+            <div id="saved-keys-panel" class="saved-keys-panel">
+              <div class="saved-keys-row">
+                <select id="saved-keys-select" class="sidebar-select-sm" title="Saved API keys"></select>
+                <button id="load-key-btn" class="mini-btn" type="button" title="Load selected key">Load</button>
+                <button id="delete-key-btn" class="mini-btn ghost" type="button" title="Delete selected key">✕</button>
+              </div>
+              <div class="saved-keys-row">
+                <input id="key-name-input" class="sidebar-input-sm" placeholder="Name for current key…"
+                  spellcheck="false" />
+                <button id="save-key-btn" class="mini-btn" type="button"
+                  title="Save current key with name">Save</button>
+              </div>
             </div>
           </div>
 
-          <div id="problems-status" class="problems-status">No problems loaded.</div>
-
-          <!-- Selectable problem list -->
-          <div id="problem-list" class="problem-list" role="listbox" aria-multiselectable="true" aria-label="Selectable problems">
-            <div class="problem-list-empty">Import all_problems.csv to begin.</div>
-          </div>
-
-          <!-- Selected summary -->
-          <div id="selected-panel" class="selected-panel hidden">
-            <div class="selected-header">
-              <span id="selected-count" class="selected-count">0 selected</span>
-              <button class="mini-btn ghost" id="clear-sel-btn" type="button">Clear all</button>
-              <button class="mini-btn ghost" id="select-all-btn" type="button">Select all</button>
+          <!-- Settings -->
+          <div class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span class="sidebar-section-title">Settings</span>
             </div>
-            <div id="selected-preview" class="selected-preview"></div>
+            <div class="settings-row">
+              <label class="settings-label">Concurrency</label>
+              <div class="settings-control">
+                <input type="range" id="parallelism-slider" min="1" max="5" value="3" step="1" class="mini-slider" />
+                <span id="parallelism-value" class="settings-val">3</span>
+              </div>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label">Max tokens</label>
+              <input type="number" id="max-tokens-input" class="sidebar-input-sm" value="1024" min="128" max="8192"
+                step="128" />
+            </div>
+            <div class="settings-row">
+              <label class="settings-label toggle-label-inline" for="use-cheatsheet-toggle">Use cheatsheet</label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="use-cheatsheet-toggle" checked />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Problems -->
+          <div class="sidebar-section sidebar-problems">
+            <div class="sidebar-section-header">
+              <span class="sidebar-section-title">Problems</span>
+              <div class="problems-import-row">
+                <button class="mini-btn" id="import-csv-btn" type="button">Import JSONL</button>
+                <input type="file" id="csv-file-input" accept=".jsonl,.json,application/json" class="hidden-file-input"
+                  aria-hidden="true" tabindex="-1" />
+                <button class="mini-btn ghost" id="clear-problems-btn" type="button">Clear</button>
+              </div>
+            </div>
+
+            <div class="search-row">
+              <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
+              <div class="filter-pills" id="filter-pills">
+                <button class="filter-pill active" data-filter="all">all</button>
+                <button class="filter-pill" data-filter="normal">normal</button>
+                <button class="filter-pill" data-filter="hard">hard</button>
+              </div>
+            </div>
+
+            <div id="problems-status" class="problems-status">No problems loaded.</div>
+
+            <!-- Selectable problem list -->
+            <div id="problem-list" class="problem-list" role="listbox" aria-multiselectable="true"
+              aria-label="Selectable problems">
+              <div class="problem-list-empty">Import a .jsonl problem file to begin.</div>
+            </div>
+
+            <!-- Selected summary -->
+            <div id="selected-panel" class="selected-panel hidden">
+              <div class="selected-header">
+                <span id="selected-count" class="selected-count">0 selected</span>
+                <button class="mini-btn ghost" id="clear-sel-btn" type="button">Clear all</button>
+                <button class="mini-btn ghost" id="select-all-btn" type="button">Select all</button>
+              </div>
+              <div id="selected-preview" class="selected-preview"></div>
+            </div>
+          </div>
+
+        </div><!-- /sidebar-content -->
+
+        <!-- Run row — always pinned at bottom -->
+        <div class="sidebar-run-row">
+          <button id="stop-btn" class="btn btn-danger" type="button" disabled>■ Stop</button>
+          <button id="run-btn" class="btn btn-primary" type="button" disabled>
+            ▶ Run (<span id="run-count">0</span>)
+          </button>
+        </div>
+
+      </aside>
+
+      <!-- ════════════════ MAIN: RUN VIEW ════════════════ -->
+      <main id="main-area">
+
+        <!-- Stats bar -->
+        <div id="stats-bar">
+          <div class="stat-chip">
+            <div class="stat-value" id="stat-remaining">—</div>
+            <div class="stat-label">criteria left</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" id="stat-done-today">—</div>
+            <div class="stat-label">done this run</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">total tasks</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" id="stat-correct">0</div>
+            <div class="stat-label">correct</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value" id="stat-accuracy">—%</div>
+            <div class="stat-label">accuracy</div>
+          </div>
+          <div class="stat-spacer"></div>
+          <button class="mini-btn ghost" id="export-csv-btn" type="button" disabled>⬇ Export CSV</button>
+        </div>
+
+        <!-- Progress bar -->
+        <div id="eval-progress-wrap" class="hidden">
+          <div class="eval-progress-track">
+            <div id="eval-progress-fill" class="eval-progress-fill" style="width:0%"></div>
+          </div>
+          <div id="eval-progress-label" class="eval-progress-label">0 / 0</div>
+        </div>
+
+        <!-- Score banner -->
+        <div id="score-banner" class="score-banner hidden">
+          <span id="score-interpretation"></span>
+        </div>
+
+        <!-- Result cards -->
+        <div id="results-area">
+          <div id="results-empty" class="results-empty">
+            <div class="results-empty-icon">∀</div>
+            <p>Select problems from the sidebar and press <strong>Run</strong> to start evaluation.</p>
+            <p class="results-empty-hint">Each result appears as a card with VERDICT, tokens, cost, and expandable
+              response / prompt.</p>
+          </div>
+          <div id="results-cards"></div>
+        </div>
+
+      </main>
+
+      <!-- ════════════════ MAIN: HISTORY VIEW ════════════════ -->
+      <div id="history-view" class="hidden">
+
+        <div class="history-header">
+          <div class="history-title-row">
+            <h2 class="history-title">Operation History</h2>
+            <span id="history-count-badge" class="history-count-badge">0 results</span>
+          </div>
+          <div class="history-filter-row">
+            <div class="history-status-tabs" id="history-status-tabs">
+              <button class="history-status-tab active" data-status="all">All</button>
+              <button class="history-status-tab" data-status="done">Done</button>
+              <button class="history-status-tab" data-status="stopped">Cancelled</button>
+              <button class="history-status-tab" data-status="error">Failed</button>
+            </div>
+            <div class="history-filter-controls">
+              <select id="history-filter-model" class="history-select">
+                <option value="">All Models</option>
+              </select>
+              <button class="mini-btn ghost" id="clear-history-btn" type="button">Clear history</button>
+            </div>
           </div>
         </div>
 
-      </div><!-- /sidebar-content -->
-
-      <!-- Run row — always pinned at bottom -->
-      <div class="sidebar-run-row">
-        <button id="stop-btn" class="btn btn-danger" type="button" disabled>■ Stop</button>
-        <button id="run-btn" class="btn btn-primary" type="button" disabled>
-          ▶ Run (<span id="run-count">0</span>)
-        </button>
-      </div>
-
-    </aside>
-
-    <!-- ════════════════ MAIN: RUN VIEW ════════════════ -->
-    <main id="main-area">
-
-      <!-- Stats bar -->
-      <div id="stats-bar">
-        <div class="stat-chip">
-          <div class="stat-value" id="stat-remaining">—</div>
-          <div class="stat-label">criteria left</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-value" id="stat-done-today">—</div>
-          <div class="stat-label">done this run</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-value" id="stat-total">0</div>
-          <div class="stat-label">total tasks</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-value" id="stat-correct">0</div>
-          <div class="stat-label">correct</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-value" id="stat-accuracy">—%</div>
-          <div class="stat-label">accuracy</div>
-        </div>
-        <div class="stat-spacer"></div>
-        <button class="mini-btn ghost" id="export-csv-btn" type="button" disabled>⬇ Export CSV</button>
-      </div>
-
-      <!-- Progress bar -->
-      <div id="eval-progress-wrap" class="hidden">
-        <div class="eval-progress-track">
-          <div id="eval-progress-fill" class="eval-progress-fill" style="width:0%"></div>
-        </div>
-        <div id="eval-progress-label" class="eval-progress-label">0 / 0</div>
-      </div>
-
-      <!-- Score banner -->
-      <div id="score-banner" class="score-banner hidden">
-        <span id="score-interpretation"></span>
-      </div>
-
-      <!-- Result cards -->
-      <div id="results-area">
-        <div id="results-empty" class="results-empty">
-          <div class="results-empty-icon">∀</div>
-          <p>Select problems from the sidebar and press <strong>Run</strong> to start evaluation.</p>
-          <p class="results-empty-hint">Each result appears as a card with VERDICT, tokens, cost, and expandable response / prompt.</p>
-        </div>
-        <div id="results-cards"></div>
-      </div>
-
-    </main>
-
-    <!-- ════════════════ MAIN: HISTORY VIEW ════════════════ -->
-    <div id="history-view" class="hidden">
-
-      <div class="history-header">
-        <div class="history-title-row">
-          <h2 class="history-title">Operation History</h2>
-          <span id="history-count-badge" class="history-count-badge">0 results</span>
-        </div>
-        <div class="history-filter-row">
-          <div class="history-status-tabs" id="history-status-tabs">
-            <button class="history-status-tab active" data-status="all">All</button>
-            <button class="history-status-tab" data-status="done">Done</button>
-            <button class="history-status-tab" data-status="stopped">Cancelled</button>
-            <button class="history-status-tab" data-status="error">Failed</button>
-          </div>
-          <div class="history-filter-controls">
-            <select id="history-filter-model" class="history-select">
-              <option value="">All Models</option>
-            </select>
-            <button class="mini-btn ghost" id="clear-history-btn" type="button">Clear history</button>
+        <div id="history-list" class="history-list">
+          <div id="history-empty" class="history-empty">
+            No evaluation history yet. Run an evaluation to see it here.
           </div>
         </div>
+
+      </div><!-- /history-view -->
+
+    </div><!-- /layout -->
+
+  </div><!-- /app-shell -->
+
+  <!-- Prompt preview modal -->
+  <div id="prompt-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true"
+    aria-label="Prompt preview">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Prompt Preview</h3>
+        <button class="modal-close" id="prompt-modal-close" aria-label="Close">&times;</button>
       </div>
-
-      <div id="history-list" class="history-list">
-        <div id="history-empty" class="history-empty">
-          No evaluation history yet. Run an evaluation to see it here.
-        </div>
+      <div class="modal-body">
+        <pre id="prompt-modal-content" class="modal-pre"></pre>
       </div>
-
-    </div><!-- /history-view -->
-
-  </div><!-- /layout -->
-
-</div><!-- /app-shell -->
-
-<!-- Prompt preview modal -->
-<div id="prompt-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Prompt preview">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Prompt Preview</h3>
-      <button class="modal-close" id="prompt-modal-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <pre id="prompt-modal-content" class="modal-pre"></pre>
     </div>
   </div>
-</div>
 
-<!-- Raw response modal -->
-<div id="log-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Raw AI output">
-  <div class="modal">
-    <div class="modal-header">
-      <h3 id="log-modal-title">Raw AI Output</h3>
-      <button class="modal-close" id="log-modal-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-meta" id="log-modal-meta"></div>
-    <div class="modal-body">
-      <pre id="log-modal-content" class="modal-pre"></pre>
+  <!-- Raw response modal -->
+  <div id="log-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Raw AI output">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="log-modal-title">Raw AI Output</h3>
+        <button class="modal-close" id="log-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-meta" id="log-modal-meta"></div>
+      <div class="modal-body">
+        <pre id="log-modal-content" class="modal-pre"></pre>
+      </div>
     </div>
   </div>
-</div>
 
-<script src="script.js" defer></script>
+  <script src="script.js" defer></script>
 </body>
+
 </html>

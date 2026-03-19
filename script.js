@@ -107,6 +107,7 @@ const PROVIDER_CATALOGUE = {
       const block = json?.content?.find?.(b => b.type === 'text');
       return block?.text ?? '';
     },
+    extractTokens: (json) => json?.usage?.input_tokens + json?.usage?.output_tokens,
   },
   xai: {
     name: 'xAI (Grok)',
@@ -137,6 +138,7 @@ const PROVIDER_CATALOGUE = {
       generationConfig: { maxOutputTokens: maxTokens },
     }),
     extractText: (json) => json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '',
+    extractTokens: (json) => json?.usageMetadata?.totalTokenCount,
   },
   meta: {
     name: 'Meta (via Together AI)',
@@ -183,6 +185,8 @@ function cacheDom() {
     // History view
     'history-view', 'history-list', 'history-count-badge',
     'history-status-tabs', 'history-filter-model', 'clear-history-btn',
+    // Saved API keys
+    'saved-keys-select', 'load-key-btn', 'delete-key-btn', 'key-name-input', 'save-key-btn',
     // Modals
     'prompt-modal-overlay', 'prompt-modal-close', 'prompt-modal-content',
     'log-modal-overlay', 'log-modal-close', 'log-modal-title', 'log-modal-meta', 'log-modal-content',
@@ -281,6 +285,9 @@ function wireUi() {
       renderHistory();
     }
   });
+
+  // Saved API keys
+  wireApiKeys();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -294,6 +301,7 @@ function init() {
   populateModelSelect(DOM.providerSelect.value);
   updateByteCounter();
   loadHistory();
+  initApiKeys();
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -372,53 +380,65 @@ function updateByteCounter() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   9. CSV PARSING & PROBLEM LIST
+   9. JSONL PARSING & PROBLEM LIST
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function readCsvFile(file) {
   const reader = new FileReader();
-  reader.onload  = (e) => parseAndLoadCsv(e.target.result);
+  reader.onload  = (e) => parseAndLoadJsonl(e.target.result);
   reader.onerror = () => showProblemsStatus('❌ Failed to read file.');
   reader.readAsText(file, 'UTF-8');
 }
 
-function parseAndLoadCsv(csvText) {
-  const lines = csvText
+/**
+ * Parses a JSONL file where each line is a JSON object with fields:
+ *   id, index, difficulty, equation1, equation2, answer (boolean)
+ */
+function parseAndLoadJsonl(text) {
+  const lines = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n')
     .filter(l => l.trim() !== '');
 
-  if (lines.length < 2) {
-    showProblemsStatus('⚠ CSV must have a header + data rows.');
+  if (!lines.length) {
+    showProblemsStatus('⚠ File is empty.');
     return;
   }
 
-  const headers = parseCsvRow(lines[0]).map(h => h.trim().toLowerCase());
-  const required = ['eq1', 'eq2', 'difficulty'];
-  const missing = required.filter(r => !headers.includes(r));
-  if (missing.length) {
-    showProblemsStatus(`⚠ Missing columns: ${missing.join(', ')}`);
-    return;
-  }
-
-  const col = (name) => headers.indexOf(name);
   const problems = [];
+  const errors   = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const cells = parseCsvRow(lines[i]);
-    if (cells.length < 3) continue;
-    const difficulty = (cells[col('difficulty')] ?? 'normal').toLowerCase().trim();
-    problems.push({
-      eq1:         (cells[col('eq1')]         ?? '').trim(),
-      eq2:         (cells[col('eq2')]         ?? '').trim(),
-      difficulty:  difficulty === 'hard' ? 'hard' : 'normal',
-      groundTruth: (cells[col('ground_truth')] ?? '').trim().toUpperCase(),
-    });
-  }
+  lines.forEach((line, lineIdx) => {
+    try {
+      const obj = JSON.parse(line);
+      // Required fields
+      const eq1 = (obj.equation1 ?? '').trim();
+      const eq2 = (obj.equation2 ?? '').trim();
+      if (!eq1 || !eq2) { errors.push(`line ${lineIdx + 1}: missing equation1/equation2`); return; }
+
+      const difficulty = (obj.difficulty ?? 'normal').toLowerCase().trim();
+      // answer is boolean true/false in JSONL
+      let groundTruth = '';
+      if (obj.answer === true)  groundTruth = 'TRUE';
+      else if (obj.answer === false) groundTruth = 'FALSE';
+      else groundTruth = String(obj.answer ?? '').toUpperCase();
+
+      problems.push({
+        id:          obj.id ?? `problem_${lineIdx + 1}`,
+        index:       obj.index ?? (lineIdx + 1),
+        eq1,
+        eq2,
+        difficulty:  difficulty === 'hard' ? 'hard' : 'normal',
+        groundTruth,
+      });
+    } catch (e) {
+      errors.push(`line ${lineIdx + 1}: invalid JSON`);
+    }
+  });
 
   if (!problems.length) {
-    showProblemsStatus('⚠ No valid problem rows found.');
+    showProblemsStatus(`⚠ No valid problem lines found.${errors.length ? ' Errors: ' + errors.slice(0, 3).join('; ') : ''}`);
     return;
   }
 
@@ -427,33 +447,15 @@ function parseAndLoadCsv(csvText) {
 
   const n = problems.filter(p => p.difficulty === 'normal').length;
   const h = problems.filter(p => p.difficulty === 'hard').length;
-  showProblemsStatus(`✅ ${problems.length} problems  (${n} normal, ${h} hard)`);
+  const errNote = errors.length ? ` (⚠ ${errors.length} skipped)` : '';
+  showProblemsStatus(`✅ ${problems.length} problems  (${n} normal, ${h} hard)${errNote}`);
 
   renderProblemList();
   updateSelectionUI();
   updateStats();
 }
 
-function parseCsvRow(line) {
-  const fields = [];
-  let current = '';
-  let inQuote = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuote) {
-      if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
-        else inQuote = false;
-      } else { current += ch; }
-    } else {
-      if (ch === '"') inQuote = true;
-      else if (ch === ',') { fields.push(current); current = ''; }
-      else current += ch;
-    }
-  }
-  fields.push(current);
-  return fields;
-}
+
 
 function clearProblems() {
   state.problems = [];
@@ -629,7 +631,18 @@ async function callApi(providerId, modelId, apiKey, prompt, maxTokens, signal) {
 
   // Best-effort metadata
   const usage  = json?.usage ?? {};
-  const tokens = (usage.completion_tokens ?? usage.output_tokens ?? usage.candidates?.[0]?.tokenCount ?? '—');
+  
+  let tokens = '—';
+  if (provider.extractTokens) {
+    tokens = provider.extractTokens(json) ?? '—';
+  } else if (usage.total_tokens) {
+    tokens = usage.total_tokens;
+  } else if (usage.completion_tokens || usage.prompt_tokens) {
+    tokens = (usage.completion_tokens || 0) + (usage.prompt_tokens || 0);
+  } else if (usage.candidates?.[0]?.tokenCount) {
+    tokens = usage.candidates?.[0]?.tokenCount;
+  }
+  
   const cost   = estimateCost(modelId, usage);
 
   return { text, elapsed, tokens, cost };
@@ -1251,4 +1264,83 @@ function renderHistoryExpanded(entry) {
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   22. API KEY MANAGER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+state.savedKeys = {};
+
+function initApiKeys() {
+  try {
+    const saved = localStorage.getItem('eq-api-keys');
+    if (saved) state.savedKeys = JSON.parse(saved);
+  } catch (_) {
+    state.savedKeys = {};
+  }
+  renderSavedKeys();
+}
+
+function wireApiKeys() {
+  DOM.saveKeyBtn.addEventListener('click', () => {
+    const name = DOM.keyNameInput.value.trim();
+    const keyVal = DOM.apiKeyInput.value.trim();
+    if (!name || !keyVal) {
+      alert("Please provide both a name and an API key to save.");
+      return;
+    }
+    state.savedKeys[name] = keyVal;
+    try {
+      localStorage.setItem('eq-api-keys', JSON.stringify(state.savedKeys));
+    } catch (_) {}
+    renderSavedKeys();
+    DOM.savedKeysSelect.value = name;
+  });
+
+  DOM.loadKeyBtn.addEventListener('click', () => {
+    const name = DOM.savedKeysSelect.value;
+    if (name && state.savedKeys[name]) {
+      DOM.apiKeyInput.value = state.savedKeys[name];
+      DOM.keyNameInput.value = name;
+    }
+  });
+
+  DOM.deleteKeyBtn.addEventListener('click', () => {
+    const name = DOM.savedKeysSelect.value;
+    if (!name) return;
+    if (confirm(`Delete saved key "${name}"?`)) {
+      delete state.savedKeys[name];
+      try {
+        localStorage.setItem('eq-api-keys', JSON.stringify(state.savedKeys));
+      } catch (_) {}
+      renderSavedKeys();
+      DOM.keyNameInput.value = '';
+    }
+  });
+}
+
+function renderSavedKeys() {
+  const select = DOM.savedKeysSelect;
+  select.innerHTML = '';
+  const names = Object.keys(state.savedKeys).sort();
+  if (names.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '-- No saved keys --';
+    select.appendChild(opt);
+    select.disabled = true;
+    DOM.loadKeyBtn.disabled = true;
+    DOM.deleteKeyBtn.disabled = true;
+  } else {
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      select.appendChild(opt);
+    });
+    select.disabled = false;
+    DOM.loadKeyBtn.disabled = false;
+    DOM.deleteKeyBtn.disabled = false;
+  }
 }

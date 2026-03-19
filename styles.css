@@ -107,6 +107,17 @@ html, body {
   color: var(--text);
 }
 
+.nav-version {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,200,0.3);
+  background: rgba(0,229,200,0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+}
+
 .nav-tabs {
   display: flex;
   gap: 2px;
@@ -871,6 +882,10 @@ html, body {
 .card-metric-val.red   { color: var(--red); }
 .card-metric-val.cyan  { color: var(--cyan); }
 .card-metric-val.muted { color: var(--text-3); }
+
+.pred-true  { color: var(--green) !important; font-weight: bold; }
+.pred-false { color: var(--red) !important; font-weight: bold; }
+.pred-na    { color: var(--text-3) !important; }
 
 .card-metric-label {
   font-size: 0.6rem;
