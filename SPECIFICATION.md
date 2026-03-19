@@ -1,7 +1,7 @@
 # Technical Specification
 
-**Equational Theories Playground — Independent Implementation**  
-Version 1.0 · 2026-03-16
+**Equational Theories Playground**  
+Version 1.1
 
 ---
 
@@ -17,40 +17,36 @@ The 4,694 laws in this project each involve at most four applications of `*` and
 
 ## 2. Data Specification
 
-**File:** `all_problems.csv`
+**Format:** `.jsonl` (JSON Lines)
 
-| Statistic | Value |
-|---|---|
-| Total problems | 1,200 |
-| Normal difficulty | 1,000 |
-| Hard difficulty | 200 |
-| Ground truth provided | None (unlabeled public set) |
-| Variables used | x, y, z, w, u, v |
-| Max operations | 4 applications of `*` |
-| Encoding | UTF-8 CSV, comma-separated |
+Each line must represent a single JSON object.
 
-### Sample Problems
+### Schema Fields
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Unique identifier |
+| `index` | number | Display index |
+| `difficulty` | string | `"normal"`, `"hard"`, or custom |
+| `equation1` | string | Hypothesis equation |
+| `equation2` | string | Conclusion equation |
+| `answer` | boolean | Ground truth (`true` or `false`) |
 
-| # | Eq1 | Eq2 | Difficulty |
-|---|---|---|---|
-| 1 | `x = ((y * (x * y)) * z) * w` | `x = (y * (x * z)) * (y * w)` | normal |
-| 2 | `x * y = z * (w * (u * u))` | `x * (y * y) = (z * w) * z` | normal |
-| 3 | `x = x * (y * ((z * x) * x))` | `x = (y * ((z * z) * y)) * w` | normal |
-| 4 | `x = y * (z * ((w * u) * u))` | `x = ((y * z) * x) * (x * w)` | normal |
-| 5 | `x = y * ((x * z) * (w * u))` | `x = (((x * x) * x) * x) * x` | normal |
+### Sample entry
+```json
+{"id": "normal_0001", "index": 1, "difficulty": "normal", "equation1": "x = ((y * (x * y)) * z) * w", "equation2": "x = (y * (x * z)) * (y * w)", "answer": true}
+```
 
 ---
 
 ## 3. Prompt Specification
 
-Below is a reference Jinja2 evaluation prompt. The final evaluation prompt may include minor adjustments. Jinja2 is a template engine that fills variables (such as equations and cheatsheet text) into a reusable prompt template; official documentation: https://jinja.palletsprojects.com/.
+Below is the standard prompt configuration used to interact with LLMs.
 
 ```
-You are a mathematician specializing in equational theories of magmas. 
-Your task is to determine whether Equation 1 ({{ equation1 }}) implies Equation 2 ({{ equation2 }}) over all magmas.
-{% if cheatsheet is defined and cheatsheet %}
-{{ cheatsheet }}
-{% endif %}
+You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 ({{ equation1 }}) implies Equation 2 ({{ equation2 }}) over all magmas.
+
+[ CHEATSHEET TEXT PLACED HERE IF PROVIDED AND ENABLED ]
+
 Output format (use exact headers without any additional text or formatting):
 VERDICT: must be exactly TRUE or FALSE (in the same line).
 REASONING: must be non-empty.
@@ -58,88 +54,58 @@ PROOF: required if VERDICT is TRUE, empty otherwise.
 COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.
 ```
 
-**Fallback:** If no match is found, the response is treated as incorrect for scoring purposes.
+**Fallback:** If no exactly matching `VERDICT: TRUE` or `VERDICT: FALSE` string is detected in the response string, the response score evaluates to incomplete ("NO ANSWER"). 
 
 ---
 
-## 4. Model Specification
+## 4. Model Capabilities & Metadata
 
-The following four models constitute the official evaluation suite for Stage 1. This playground routes to each model via the respective provider API.
+The playground talks directly to LLM provider APIs (Anthropic, Meta/Together, OpenAI, Google, xAI) right from the browser window using standard CORS endpoint fetching. There is no intermediate proxy or server.
 
-| Provider | Model ID | Context | Cost Tier |
-|---|---|---|---|
-| xAI | `grok-4-fast` | 128k | Low |
-| OpenAI | `gpt-oss-120b` | 128k | Medium |
-| Meta | `meta-llama/Llama-3.3-70B-Instruct` | 128k | Low |
-| Google | `gemini-3.1-flash-lite-preview` | 1M | Very low |
+The app supports metadata capture by grabbing output `usage` objects in responses to measure and display input tokens and runtime duration. Costs are continuously summed using approximations of known provider model billing parameters (USD).
 
-- **Recommended cost budget:** ≤ USD 0.01 per problem
-- **Time limit:** ≤ 10 minutes per problem
-- **Evaluation setting:** No-tools (no web search, no code execution, no external retrieval). All reasoning must occur within a single forward pass.
+All keys are securely contained inside the `eq-api-keys` context on your `localStorage`.
+
+### Model Implementations Provided
+- xAI: `grok-4-fast`, `grok-3`, `grok-3-mini`
+- OpenAI: `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-oss-120b`
+- Meta: `meta-llama/Llama-3.3-70B-Instruct`, `meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo`
+- Google: `gemini-2.0-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-2.0-flash`
+- Anthropic: `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-3-5-sonnet-20241022`, `claude-3-haiku-20240307`
 
 ---
 
 ## 5. Scoring Specification
 
-**Metric:** Simple accuracy — fraction of problems answered correctly.
+**Metric:** Accuracy (correct answers divided by total answerable answers).
 
-**Baseline:** Random guessing yields ~50% (evaluation set is balanced 50/50).
-
-**Target:** Stage 1 cheatsheets have been observed to push cheap models to 55–60%+. Top submissions are expected to do better.
-
-| Score Range | Interpretation |
-|---|---|
-| < 50% | Worse than random — cheatsheet is actively harmful |
-| 50–52% | Approximately random — cheatsheet has no effect |
-| 53–58% | Modest improvement — cheatsheet is helping |
-| 59–65% | Good — competitive submission range |
-| > 65% | Excellent — strong cheatsheet content |
+Run evaluation chunks are stored persistently into your user data under the `eq-history` `localStorage` object.
+These histories provide comprehensive review records consisting of prompt inputs, full output text logs, time/cost stats, verified assertions, expected evaluation outputs against `answer`, and the active selected evaluation model.
 
 ---
 
 ## 6. Cheatsheet Specification
 
-**Format:** Plain UTF-8 text. No binary formats, no markup.
+**Format:** Plain UTF-8 text.
+**Size limit:** Max 10,240 bytes (truncated programmatically if exceeded when the API run initiates).
 
-**Size limit:** 10,240 bytes (10 KB) as measured by `len(cheatsheet.encode('utf-8'))`.
-
-### Content Guidance *(not enforced, but effective cheatsheets typically include)*
-
+### Content Guidance *(useful starting concepts)*
 - Fundamental implication facts (trivial law, singleton law, transitivity)
 - Structural heuristics: variable count, symmetry, idempotency checks
-- Known families: left-zero, right-zero, commutative, associative, group-like
-- Small counterexample construction strategies (2–4 element magmas)
-- Rewriting strategies for proving implications step by step
-- Duality: `E(x,y)` implies `E'(x,y)` iff `E^op(x,y)` implies `E'^op(x,y)`
+- Known algebraic groupings: left-zero, right-zero, commutative, associative, group-like
+- Methods to build up finite counterexamples over 2-4 variables
+- Rewriting instructions
 
 ### Anti-Patterns to Avoid
-
-- Lists of specific law IDs (E1...E4694) without explanation — models cannot memorize 4,694 entries
-- Content that increases verbosity without adding reasoning guidance
-- Instructions that contradict each other or confuse the model
-
----
-
-## 7. Playground Architecture
-
-The independent playground is a multi-file web application. The architecture is:
-
-| Component | Implementation |
-|---|---|
-| UI | Separated `index.html`, `styles.css`, `script.js` |
-| API routing | Direct `fetch()` to provider APIs from the browser |
-| Parallelism | Configurable (1–5 concurrent requests) |
-| Result storage | In-memory JS state; export to CSV |
-| Problem source | `all_problems.csv` (1,200 problems, local) |
-| Cheatsheet | Plain textarea, byte-counted in real time |
+- Submitting thousands of predefined laws inline (poor token density vs effectiveness)
+- Including self-conflicting instructions
+- Extremely obscure instructions that overshadow the standard equations
 
 ---
 
-## 8. Mathematical Background
+## 7. Mathematical Background
 
-### Magma Laws in This Dataset
-
-Each law is an equation of the form `t1 = t2` where both sides are terms built from variables and at most 4 applications of `*`. Notable special cases:
+### Magma Laws
 
 | Equation | Name / Significance |
 |---|---|
@@ -149,20 +115,13 @@ Each law is an equation of the form `t1 = t2` where both sides are terms built f
 | `x = x * y` | E4: left-absorbing |
 | `x * y = y * x` | Commutativity |
 | `x * (y * z) = (x * y) * z` | Associativity (group axiom) |
-| `x * (y * z) = (z * w) * w` | ETP example — hard instance |
 
-### Proving Implication (TRUE)
+### Proving Implication (`TRUE`)
+Standard term rewriting and transitivity techniques apply in algebraic systems like magmas.
 
-The standard approach is **term rewriting**: use `E1` as a rewrite rule (in both directions) and apply it repeatedly to the LHS or RHS of `E2` until both sides match. This is decidable for ground terms but undecidable in general for equational logic *(Tarski 1953)*.
-
-### Disproving Implication (FALSE)
-
-Construct a finite magma `M` satisfying `E1` and find elements `a, b, ... ∈ M` such that `E2(a,b,...)` fails. Two- and three-element magmas suffice for the majority of FALSE instances in this dataset.
-
-### Hardness
-
-The 200 hard problems are specifically selected to resist simple heuristics: they are not resolvable by variable-count arguments, constant magma counterexamples, or single-step rewriting.
+### Disproving Implication (`FALSE`)
+Construct a finite magma (usually small, 2-to-3 element domains) satisfying `E1` but failing to satisfy `E2` for at least one case constraint.
 
 ---
 
-*This specification describes the independent playground implementation. The official competition rules at [competition.sair.foundation](https://competition.sair.foundation) take precedence for submission and scoring purposes. Organized by Damek Davis and Terence Tao, hosted by the SAIR Foundation.*
+*This specification applies to the independent playground application. Based on research from the Equational Theories Project.*
