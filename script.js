@@ -299,9 +299,36 @@ function init() {
   wireUi();
   populateProviderSelect();
   populateModelSelect(DOM.providerSelect.value);
-  updateByteCounter();
   loadHistory();
   initApiKeys();
+  loadStoredData();
+  updateByteCounter();
+}
+
+function loadStoredData() {
+  try {
+    const pStr = localStorage.getItem('eq-problems');
+    if (pStr) {
+      const p = JSON.parse(pStr);
+      if (Array.isArray(p) && p.length > 0) {
+        state.problems = p;
+        state.selectedIndices.clear();
+        const n = p.filter(x => x.difficulty === 'normal').length;
+        const h = p.filter(x => x.difficulty === 'hard').length;
+        showProblemsStatus(`✅ ${p.length} problems loaded from storage`);
+        renderProblemList();
+        updateSelectionUI();
+        updateStats();
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const cStr = localStorage.getItem('eq-cheatsheet');
+    if (cStr) {
+      DOM.cheatsheetTextarea.value = cStr;
+    }
+  } catch(e) {}
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -358,6 +385,7 @@ function populateModelSelect(providerId) {
 
 function updateByteCounter() {
   const text  = DOM.cheatsheetTextarea.value;
+  try { localStorage.setItem('eq-cheatsheet', text); } catch(e) {}
   const bytes = new TextEncoder().encode(text).length;
   const pct   = bytes / MAX_CHEATSHEET_BYTES;
 
@@ -445,6 +473,8 @@ function parseAndLoadJsonl(text) {
   state.problems = problems;
   state.selectedIndices.clear();
 
+  try { localStorage.setItem('eq-problems', JSON.stringify(state.problems)); } catch(e) {}
+
   const n = problems.filter(p => p.difficulty === 'normal').length;
   const h = problems.filter(p => p.difficulty === 'hard').length;
   const errNote = errors.length ? ` (⚠ ${errors.length} skipped)` : '';
@@ -460,6 +490,7 @@ function parseAndLoadJsonl(text) {
 function clearProblems() {
   state.problems = [];
   state.selectedIndices.clear();
+  try { localStorage.removeItem('eq-problems'); } catch(e) {}
   DOM.csvFileInput.value = '';
   showProblemsStatus('No problems loaded.');
   renderProblemList();
@@ -1176,37 +1207,32 @@ function renderHistory() {
 
     const statusLabel = { done: 'DONE', stopped: 'CANCELLED', error: 'FAILED' }[entry.status] ?? 'DONE';
 
-    const accuracyStr = entry.accuracy != null
-      ? `${entry.correct}/${entry.scorable} (${(entry.accuracy * 100).toFixed(1)}%)`
-      : `${entry.doneCount}/${entry.total}`;
-    const costStr  = entry.totalCost > 0 ? `$${entry.totalCost.toFixed(4)}` : '$0.0000';
-    const pending  = entry.total - entry.doneCount;
-    const timeStr  = new Date(entry.timestamp).toLocaleString();
+    let accuracyStr = '';
+    if (entry.status === 'done' || entry.status === 'stopped' || entry.status === 'error') {
+      const scorable = entry.scorable || 1; // avoid division by zero
+      const pct = scorable > 0 ? Math.round(((entry.correct||0) / scorable) * 100) : 0;
+      accuracyStr = `${entry.correct}/${entry.scorable} (${pct}%)`;
+    } else {
+      accuracyStr = `${entry.doneCount}/${entry.total} (pending)`;
+    }
+    
+    // Fallback to entry.totalCost if present, wait, let's safely format it explicitly matching exactly
+    const costStr  = (entry.totalCost > 0 ? entry.totalCost : 0).toFixed(2);
+    const timeStr  = new Date(entry.timestamp).toLocaleString(undefined, {
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', second: '2-digit'
+      // to match format: 5/19/2026, 10:22:30 PM (or dependent on local)
+    });
 
     div.innerHTML = `
-      <div class="history-row-main">
-        <div class="history-row-left">
+      <div class="history-item-header" onclick="toggleHistoryExpand(${idx})">
+        <div class="history-item-left">
           <span class="history-status-badge ${entry.status}">${statusLabel}</span>
-          <div class="history-row-info">
-            <div class="history-model-name">${escHtml(entry.provider)}/${escHtml(entry.model)}</div>
-            <div class="history-row-meta">${entry.total} problem${entry.total !== 1 ? 's' : ''} · ${entry.doneCount} evaluated</div>
-          </div>
+          <span class="history-model-name">${escHtml(entry.provider)}/${escHtml(entry.model)}</span>
         </div>
-        <div class="history-row-stats">
-          <div class="history-stat">
-            <span class="history-stat-val">${accuracyStr}</span>
-            <span class="history-stat-label">correct</span>
-          </div>
-          <div class="history-stat">
-            <span class="history-stat-val">${costStr}</span>
-            <span class="history-stat-label">cost</span>
-          </div>
-          <div class="history-stat">
-            <span class="history-stat-val">${pending}</span>
-            <span class="history-stat-label">pending</span>
-          </div>
-          <div class="history-row-time">${escHtml(timeStr)}</div>
-          <button class="history-expand-btn" onclick="toggleHistoryExpand(${idx})" aria-label="Expand" title="Show details">▼</button>
+        <div class="history-item-right">
+          <span class="history-row-stats-text">${accuracyStr} &nbsp; ${costStr} credits &nbsp; ${timeStr}</span>
+          <button class="history-expand-btn" aria-label="Expand" title="Show details">▼</button>
         </div>
       </div>
       <div class="history-expanded-content hidden" id="hist-expand-${idx}">

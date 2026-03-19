@@ -1203,7 +1203,6 @@ html, body {
   text-align: center;
 }
 
-/* History row */
 .history-row {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1213,19 +1212,22 @@ html, body {
 }
 .history-row:hover { border-color: var(--border-acc); }
 
-.history-row-main {
+.history-item-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  background: transparent;
+  transition: background var(--trans);
 }
+.history-item-header:hover { background: rgba(255,255,255,0.02); }
 
-.history-row-left {
+.history-item-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   flex: 1;
-  min-width: 0;
 }
 
 .history-status-badge {
@@ -1242,77 +1244,41 @@ html, body {
 .history-status-badge.stopped { background: rgba(245,158,11,0.12); color: var(--amber); }
 .history-status-badge.error   { background: var(--red-dim); color: var(--red); }
 
-.history-row-info { min-width: 0; }
-
 .history-model-name {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.history-row-meta {
-  font-size: 0.68rem;
-  color: var(--text-3);
-  margin-top: 1px;
-}
-
-.history-row-stats {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  flex-shrink: 0;
-}
-
-.history-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  min-width: 60px;
-}
-
-.history-stat-val {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
 }
 
-.history-stat-label {
-  font-size: 0.6rem;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.history-item-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
 }
 
-.history-row-time {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
+.history-row-stats-text {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
   color: var(--text-3);
   white-space: nowrap;
-  min-width: 130px;
-  text-align: right;
 }
 
 .history-expand-btn {
   background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border: none;
   color: var(--text-3);
-  width: 26px;
-  height: 26px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  font-size: 0.65rem;
-  transition: all var(--trans);
-  flex-shrink: 0;
+  transition: transform var(--trans), color var(--trans);
 }
+.history-item-header:hover .history-expand-btn { color: var(--text); }
 .history-expand-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 
 /* Expanded detail table */
