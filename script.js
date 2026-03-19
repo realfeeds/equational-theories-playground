@@ -33,11 +33,11 @@
 const MAX_CHEATSHEET_BYTES = 10_240;
 
 const SCORE_THRESHOLDS = [
-  { min: 0.65, label: '> 65% — Excellent — strong cheatsheet content ✨',       cls: 'level-excel'  },
-  { min: 0.59, label: '59–65% — Good — competitive submission range 📈',         cls: 'level-good'   },
+  { min: 0.65, label: '> 65% — Excellent — strong cheatsheet content ✨', cls: 'level-excel' },
+  { min: 0.59, label: '59–65% — Good — competitive submission range 📈', cls: 'level-good' },
   { min: 0.53, label: '53–58% — Modest improvement — cheatsheet is helping 📊', cls: 'level-modest' },
   { min: 0.50, label: '50–52% — Random — cheatsheet has no measurable effect ─', cls: 'level-random' },
-  { min: 0,    label: '< 50% — Worse than random — cheatsheet may be harmful ⚠', cls: 'level-below'  },
+  { min: 0, label: '< 50% — Worse than random — cheatsheet may be harmful ⚠', cls: 'level-below' },
 ];
 
 /** Matches VERDICT: TRUE or VERDICT: FALSE (case-insensitive, last match wins) */
@@ -80,11 +80,11 @@ const PROVIDER_CATALOGUE = {
     baseUrl: 'https://api.openai.com/v1/chat/completions',
     authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
     models: [
-      { id: 'gpt-4o',          label: 'GPT-4o' },
-      { id: 'gpt-4o-mini',     label: 'GPT-4o Mini' },
-      { id: 'gpt-oss-120b',    label: 'gpt-oss-120b (Stage 1)' },
-      { id: 'o3-mini',         label: 'o3-mini' },
-      { id: 'gpt-4-turbo',     label: 'GPT-4 Turbo' },
+      { id: 'gpt-4o', label: 'GPT-4o' },
+      { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+      { id: 'gpt-oss-120b', label: 'gpt-oss-120b (Stage 1)' },
+      { id: 'o3-mini', label: 'o3-mini' },
+      { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
     ],
     buildBody: (model, messages, maxTokens) => ({ model, messages, max_completion_tokens: maxTokens }),
     extractText: (json) => json?.choices?.[0]?.message?.content ?? '',
@@ -94,10 +94,10 @@ const PROVIDER_CATALOGUE = {
     baseUrl: 'https://api.anthropic.com/v1/messages',
     authHeader: (key) => ({ 'x-api-key': key, 'anthropic-version': '2023-06-01' }),
     models: [
-      { id: 'claude-opus-4-5',            label: 'Claude Opus 4.5' },
-      { id: 'claude-sonnet-4-5',          label: 'Claude Sonnet 4.5' },
+      { id: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
+      { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
       { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3-haiku-20240307',    label: 'Claude 3 Haiku' },
+      { id: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
     ],
     buildBody: (model, messages, maxTokens) => ({ model, max_tokens: maxTokens, messages }),
     extractText: (json) => {
@@ -112,7 +112,7 @@ const PROVIDER_CATALOGUE = {
     authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
     models: [
       { id: 'grok-4-fast', label: 'Grok 4 Fast (Stage 1)' },
-      { id: 'grok-3',      label: 'Grok 3' },
+      { id: 'grok-3', label: 'Grok 3' },
       { id: 'grok-3-mini', label: 'Grok 3 Mini' },
     ],
     buildBody: (model, messages, maxTokens) => ({ model, messages, max_tokens: maxTokens }),
@@ -123,9 +123,9 @@ const PROVIDER_CATALOGUE = {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
     authHeader: (_key) => ({}),
     models: [
-      { id: 'gemini-2.0-flash-lite',             label: 'Gemini 2.0 Flash Lite' },
-      { id: 'gemini-3.1-flash-lite-preview',     label: 'Gemini 3.1 Flash Lite Preview (Stage 1)' },
-      { id: 'gemini-2.0-flash',                  label: 'Gemini 2.0 Flash' },
+      { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
+      { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite Preview (Stage 1)' },
+      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
     ],
     buildBody: (model, messages, maxTokens) => ({
       contents: messages.map(m => ({
@@ -142,7 +142,7 @@ const PROVIDER_CATALOGUE = {
     baseUrl: 'https://api.together.xyz/v1/chat/completions',
     authHeader: (key) => ({ 'Authorization': `Bearer ${key}` }),
     models: [
-      { id: 'meta-llama/Llama-3.3-70B-Instruct',          label: 'Llama 3.3 70B Instruct (Stage 1)' },
+      { id: 'meta-llama/Llama-3.3-70B-Instruct', label: 'Llama 3.3 70B Instruct (Stage 1)' },
       { id: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', label: 'Llama 3.1 8B Instruct Turbo' },
     ],
     buildBody: (model, messages, maxTokens) => ({ model, messages, max_tokens: maxTokens }),
@@ -293,14 +293,14 @@ function loadStoredData() {
         updateStats();
       }
     }
-  } catch(e) {}
+  } catch (e) { }
 
   try {
     const cStr = localStorage.getItem('eq-cheatsheet');
     if (cStr) {
       DOM.cheatsheetTextarea.value = cStr;
     }
-  } catch(e) {}
+  } catch (e) { }
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -356,10 +356,10 @@ function populateModelSelect(providerId) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function updateByteCounter() {
-  const text  = DOM.cheatsheetTextarea.value;
-  try { localStorage.setItem('eq-cheatsheet', text); } catch(e) {}
+  const text = DOM.cheatsheetTextarea.value;
+  try { localStorage.setItem('eq-cheatsheet', text); } catch (e) { }
   const bytes = new TextEncoder().encode(text).length;
-  const pct   = bytes / MAX_CHEATSHEET_BYTES;
+  const pct = bytes / MAX_CHEATSHEET_BYTES;
 
   // Pill display
   const pill = DOM.byteCount;
@@ -385,7 +385,7 @@ function updateByteCounter() {
 
 function readCsvFile(file) {
   const reader = new FileReader();
-  reader.onload  = (e) => parseAndLoadJsonl(e.target.result);
+  reader.onload = (e) => parseAndLoadJsonl(e.target.result);
   reader.onerror = () => showProblemsStatus('❌ Failed to read file.');
   reader.readAsText(file, 'UTF-8');
 }
@@ -407,7 +407,7 @@ function parseAndLoadJsonl(text) {
   }
 
   const problems = [];
-  const errors   = [];
+  const errors = [];
 
   lines.forEach((line, lineIdx) => {
     try {
@@ -420,16 +420,16 @@ function parseAndLoadJsonl(text) {
       const difficulty = (obj.difficulty ?? 'normal').toLowerCase().trim();
       // answer is boolean true/false in JSONL
       let groundTruth = '';
-      if (obj.answer === true)  groundTruth = 'TRUE';
+      if (obj.answer === true) groundTruth = 'TRUE';
       else if (obj.answer === false) groundTruth = 'FALSE';
       else groundTruth = String(obj.answer ?? '').toUpperCase();
 
       problems.push({
-        id:          obj.id ?? `problem_${lineIdx + 1}`,
-        index:       obj.index ?? (lineIdx + 1),
+        id: obj.id ?? `problem_${lineIdx + 1}`,
+        index: obj.index ?? (lineIdx + 1),
         eq1,
         eq2,
-        difficulty:  difficulty === 'hard' ? 'hard' : 'normal',
+        difficulty: difficulty === 'hard' ? 'hard' : 'normal',
         groundTruth,
       });
     } catch (e) {
@@ -445,7 +445,7 @@ function parseAndLoadJsonl(text) {
   state.problems = problems;
   state.selectedIndices.clear();
 
-  try { localStorage.setItem('eq-problems', JSON.stringify(state.problems)); } catch(e) {}
+  try { localStorage.setItem('eq-problems', JSON.stringify(state.problems)); } catch (e) { }
 
   const n = problems.filter(p => p.difficulty === 'normal').length;
   const h = problems.filter(p => p.difficulty === 'hard').length;
@@ -462,7 +462,7 @@ function parseAndLoadJsonl(text) {
 function clearProblems() {
   state.problems = [];
   state.selectedIndices.clear();
-  try { localStorage.removeItem('eq-problems'); } catch(e) {}
+  try { localStorage.removeItem('eq-problems'); } catch (e) { }
   DOM.csvFileInput.value = '';
   showProblemsStatus('No problems loaded.');
   renderProblemList();
@@ -479,7 +479,7 @@ function showProblemsStatus(msg) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function getFilteredProblems() {
-  const q    = state.searchQuery.toLowerCase();
+  const q = state.searchQuery.toLowerCase();
   const diff = state.difficultyFilter;
   return state.problems
     .map((p, idx) => ({ p, idx }))
@@ -487,7 +487,7 @@ function getFilteredProblems() {
       if (diff !== 'all' && p.difficulty !== diff) return false;
       if (q) {
         const matchNum = `#${idx + 1}`.includes(q) || String(idx + 1).includes(q);
-        const matchEq  = p.eq1.toLowerCase().includes(q) || p.eq2.toLowerCase().includes(q);
+        const matchEq = p.eq1.toLowerCase().includes(q) || p.eq2.toLowerCase().includes(q);
         if (!matchNum && !matchEq) return false;
       }
       return true;
@@ -495,8 +495,8 @@ function getFilteredProblems() {
 }
 
 function renderProblemList() {
-  const list    = DOM.problemList;
-  const items   = getFilteredProblems();
+  const list = DOM.problemList;
+  const items = getFilteredProblems();
   list.innerHTML = '';
 
   if (!state.problems.length) {
@@ -577,9 +577,9 @@ function buildPrompt(problem, cheatsheetText, useCheatsheet) {
   // Truncate cheatsheet to MAX_CHEATSHEET_BYTES
   let cheatsheet = '';
   if (useCheatsheet && cheatsheetText.trim().length > 0) {
-    const enc   = new TextEncoder();
+    const enc = new TextEncoder();
     const bytes = enc.encode(cheatsheetText);
-    cheatsheet  = bytes.length > MAX_CHEATSHEET_BYTES
+    cheatsheet = bytes.length > MAX_CHEATSHEET_BYTES
       ? new TextDecoder().decode(bytes.slice(0, MAX_CHEATSHEET_BYTES))
       : cheatsheetText;
   }
@@ -608,14 +608,14 @@ async function callApi(providerId, modelId, apiKey, prompt, maxTokens, signal) {
   if (!provider) throw new Error(`Unknown provider: ${providerId}`);
 
   const messages = [{ role: 'user', content: prompt }];
-  const body     = provider.buildBody(modelId, messages, maxTokens);
+  const body = provider.buildBody(modelId, messages, maxTokens);
 
   let url = provider.baseUrl.replace('{model}', modelId);
   if (providerId === 'google') url += `?key=${encodeURIComponent(apiKey)}`;
 
   const headers = { 'Content-Type': 'application/json', ...provider.authHeader(apiKey) };
 
-  const tStart   = Date.now();
+  const tStart = Date.now();
   const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
 
   if (!response.ok) {
@@ -633,8 +633,8 @@ async function callApi(providerId, modelId, apiKey, prompt, maxTokens, signal) {
   const elapsed = Date.now() - tStart;
 
   // Best-effort metadata
-  const usage  = json?.usage ?? {};
-  
+  const usage = json?.usage ?? {};
+
   let tokens = '—';
   if (provider.extractTokens) {
     tokens = provider.extractTokens(json) ?? '—';
@@ -645,29 +645,29 @@ async function callApi(providerId, modelId, apiKey, prompt, maxTokens, signal) {
   } else if (usage.candidates?.[0]?.tokenCount) {
     tokens = usage.candidates?.[0]?.tokenCount;
   }
-  
-  const cost   = estimateCost(modelId, usage);
+
+  const cost = estimateCost(modelId, usage);
 
   return { text, elapsed, tokens, cost };
 }
 
 /** Very rough cost estimate in USD */
 function estimateCost(modelId, usage) {
-  const inTokens  = usage.prompt_tokens ?? usage.input_tokens ?? 0;
+  const inTokens = usage.prompt_tokens ?? usage.input_tokens ?? 0;
   const outTokens = usage.completion_tokens ?? usage.output_tokens ?? 0;
   if (!inTokens && !outTokens) return null;
 
   // Approximate per-1k-token prices (USD)
   const PRICES = {
-    'gpt-4o':       [0.005,  0.015],
-    'gpt-4o-mini':  [0.00015,0.0006],
-    'gpt-oss-120b': [0.003,  0.009],
-    'o3-mini':      [0.0011, 0.0044],
-    'gpt-4-turbo':  [0.01,   0.03],
-    'grok-4-fast':  [0.002,  0.006],
-    'grok-3':       [0.003,  0.009],
-    'grok-3-mini':  [0.0003, 0.0005],
-    'default':      [0.001,  0.003],
+    'gpt-4o': [0.005, 0.015],
+    'gpt-4o-mini': [0.00015, 0.0006],
+    'gpt-oss-120b': [0.003, 0.009],
+    'o3-mini': [0.0011, 0.0044],
+    'gpt-4-turbo': [0.01, 0.03],
+    'grok-4-fast': [0.002, 0.006],
+    'grok-3': [0.003, 0.009],
+    'grok-3-mini': [0.0003, 0.0005],
+    'default': [0.001, 0.003],
   };
   const [pIn, pOut] = PRICES[modelId] ?? PRICES['default'];
   return (inTokens / 1000) * pIn + (outTokens / 1000) * pOut;
@@ -701,31 +701,31 @@ async function startEvaluation() {
   if (state.selectedIndices.size === 0) { alert('Select at least one problem.'); return; }
 
   const selectedSorted = [...state.selectedIndices].sort((a, b) => a - b);
-  const parallelism    = parseInt(DOM.parallelismSlider.value, 10);
-  const maxTokens      = parseInt(DOM.maxTokensInput.value, 10) || 1024;
-  const providerId     = DOM.providerSelect.value;
-  const modelId        = DOM.modelSelect.value;
-  const useCheatsheet  = DOM.useCheatsheetToggle.checked;
-  const cheatsheet     = DOM.cheatsheetTextarea.value;
+  const parallelism = parseInt(DOM.parallelismSlider.value, 10);
+  const maxTokens = parseInt(DOM.maxTokensInput.value, 10) || 1024;
+  const providerId = DOM.providerSelect.value;
+  const modelId = DOM.modelSelect.value;
+  const useCheatsheet = DOM.useCheatsheetToggle.checked;
+  const cheatsheet = DOM.cheatsheetTextarea.value;
 
   // Build results array
   state.results = selectedSorted.map(idx => {
     const p = state.problems[idx];
     return {
-      problemIdx:  idx,
-      eq1:         p.eq1,
-      eq2:         p.eq2,
-      difficulty:  p.difficulty,
+      problemIdx: idx,
+      eq1: p.eq1,
+      eq2: p.eq2,
+      difficulty: p.difficulty,
       groundTruth: p.groundTruth,
-      prediction:  '',
-      correct:     null,
-      status:      'pending',
+      prediction: '',
+      correct: null,
+      status: 'pending',
       rawResponse: '',
-      errorMsg:    '',
-      prompt:      buildPrompt(p, cheatsheet, useCheatsheet),
-      elapsed:     null,
-      tokens:      null,
-      cost:        null,
+      errorMsg: '',
+      prompt: buildPrompt(p, cheatsheet, useCheatsheet),
+      elapsed: null,
+      tokens: null,
+      cost: null,
     };
   });
 
@@ -735,7 +735,7 @@ async function startEvaluation() {
   // UI setup
   DOM.resultsEmpty.classList.add('hidden');
   DOM.resultsCards.innerHTML = '';
-  DOM.runBtn.disabled  = true;
+  DOM.runBtn.disabled = true;
   DOM.stopBtn.disabled = false;
   setStatusBadge('running', 'RUNNING');
   DOM.evalProgressWrap.classList.remove('hidden');
@@ -748,7 +748,7 @@ async function startEvaluation() {
   await runBatch(state.results, providerId, modelId, apiKey, maxTokens, parallelism);
 
   state.running = false;
-  DOM.runBtn.disabled  = state.selectedIndices.size === 0;
+  DOM.runBtn.disabled = state.selectedIndices.size === 0;
   DOM.stopBtn.disabled = true;
 
   const aborted = state.abortController.signal.aborted;
@@ -759,15 +759,15 @@ async function startEvaluation() {
 function stopEvaluation() {
   state.abortController?.abort();
   state.running = false;
-  DOM.runBtn.disabled  = state.selectedIndices.size === 0;
+  DOM.runBtn.disabled = state.selectedIndices.size === 0;
   DOM.stopBtn.disabled = true;
   setStatusBadge('idle', 'STOPPED');
 }
 
 async function runBatch(results, providerId, modelId, apiKey, maxTokens, parallelism) {
-  const signal    = state.abortController.signal;
-  const pool      = new Set();
-  let   nextIndex = 0;
+  const signal = state.abortController.signal;
+  const pool = new Set();
+  let nextIndex = 0;
 
   const runOne = async (i) => {
     const result = results[i];
@@ -779,20 +779,20 @@ async function runBatch(results, providerId, modelId, apiKey, maxTokens, paralle
         providerId, modelId, apiKey, result.prompt, maxTokens, signal
       );
       result.rawResponse = text;
-      result.prediction  = extractAnswer(text);
-      result.elapsed     = elapsed;
-      result.tokens      = tokens;
-      result.cost        = cost;
-      result.correct     = result.groundTruth
+      result.prediction = extractAnswer(text);
+      result.elapsed = elapsed;
+      result.tokens = tokens;
+      result.cost = cost;
+      result.correct = result.groundTruth
         ? result.prediction === result.groundTruth
         : null;
       result.status = 'done';
     } catch (err) {
       if (err.name === 'AbortError') {
-        result.status   = 'skipped';
+        result.status = 'skipped';
         result.errorMsg = 'Cancelled';
       } else {
-        result.status   = 'error';
+        result.status = 'error';
         result.errorMsg = err.message || String(err);
         console.error(`Problem #${result.problemIdx + 1} failed:`, err);
       }
@@ -809,7 +809,7 @@ async function runBatch(results, providerId, modelId, apiKey, maxTokens, paralle
   while (nextIndex < results.length || pool.size > 0) {
     if (signal.aborted && pool.size === 0) break;
     while (!signal.aborted && nextIndex < results.length && pool.size < parallelism) {
-      const i   = nextIndex++;
+      const i = nextIndex++;
       const job = runOne(i).finally(() => pool.delete(job));
       pool.add(job);
     }
@@ -829,16 +829,16 @@ function createCard(i) {
 }
 
 function updateCard(i) {
-  const r   = state.results[i];
+  const r = state.results[i];
   const div = document.getElementById(`card-${i}`);
   if (!div) return;
 
   const providerId = DOM.providerSelect.value;
-  const modelId    = DOM.modelSelect.value;
+  const modelId = DOM.modelSelect.value;
 
   // Verdict badge
   let verdictBadgeClass = 'pending';
-  let verdictBadgeText  = 'PENDING';
+  let verdictBadgeText = 'PENDING';
   if (r.status === 'running') {
     verdictBadgeClass = 'running'; verdictBadgeText = 'RUNNING…';
   } else if (r.status === 'skipped') {
@@ -846,7 +846,7 @@ function updateCard(i) {
   } else if (r.status === 'error') {
     verdictBadgeClass = 'error'; verdictBadgeText = 'ERROR';
   } else if (r.status === 'done') {
-    if (r.correct === true)  { verdictBadgeClass = 'correct';  verdictBadgeText = 'CORRECT'; }
+    if (r.correct === true) { verdictBadgeClass = 'correct'; verdictBadgeText = 'CORRECT'; }
     else if (r.correct === false) { verdictBadgeClass = 'incorrect'; verdictBadgeText = 'INCORRECT'; }
     else { verdictBadgeClass = 'no-truth'; verdictBadgeText = r.prediction || 'NO ANSWER'; }
   }
@@ -854,13 +854,13 @@ function updateCard(i) {
   // Card-level border class
   let cardClass = 'result-card';
   if (r.status === 'running' || r.status === 'pending') cardClass += ' status-running';
-  if (r.status === 'done' && r.prediction === 'TRUE')  cardClass += ' verdict-true';
+  if (r.status === 'done' && r.prediction === 'TRUE') cardClass += ' verdict-true';
   if (r.status === 'done' && r.prediction === 'FALSE') cardClass += ' verdict-false';
 
   // Metrics
-  const timeStr  = r.elapsed != null ? `${(r.elapsed / 1000).toFixed(1)}s` : '—';
-  const tokStr   = r.tokens  != null ? String(r.tokens) : '—';
-  const costStr  = r.cost    != null ? `$${r.cost.toFixed(4)}` : '$0.0000';
+  const timeStr = r.elapsed != null ? `${(r.elapsed / 1000).toFixed(1)}s` : '—';
+  const tokStr = r.tokens != null ? String(r.tokens) : '—';
+  const costStr = r.cost != null ? `$${r.cost.toFixed(4)}` : '$0.0000';
   const predClass = r.prediction === 'TRUE' ? 'green' : r.prediction === 'FALSE' ? 'red' : 'muted';
 
   // Action buttons enabled only when done
@@ -919,7 +919,7 @@ function toggleCardDetail(i, _type) {
   detail.classList.toggle('visible');
   // Update button label
   const card = document.getElementById(`card-${i}`);
-  const btn  = card?.querySelector('.card-action-btn');
+  const btn = card?.querySelector('.card-action-btn');
   if (btn) btn.textContent = detail.classList.contains('visible') ? 'Hide response' : 'Show response';
 }
 
@@ -928,24 +928,24 @@ function toggleCardDetail(i, _type) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function updateStats() {
-  const total   = state.results.length;
-  const done    = state.results.filter(r => r.status === 'done').length;
-  const errors  = state.results.filter(r => r.status === 'error').length;
+  const total = state.results.length;
+  const done = state.results.filter(r => r.status === 'done').length;
+  const errors = state.results.filter(r => r.status === 'error').length;
   const correct = state.results.filter(r => r.correct === true).length;
-  const scorable= state.results.filter(r => r.correct !== null).length;
+  const scorable = state.results.filter(r => r.correct !== null).length;
   const remaining = total - done - errors;
 
-  DOM.statTotal.textContent    = total;
-  DOM.statRemaining.textContent= remaining >= 0 ? remaining : '—';
-  DOM.statDoneToday.textContent= done;
-  DOM.statCorrect.textContent  = correct;
+  DOM.statTotal.textContent = total;
+  DOM.statRemaining.textContent = remaining >= 0 ? remaining : '—';
+  DOM.statDoneToday.textContent = done;
+  DOM.statCorrect.textContent = correct;
   DOM.statAccuracy.textContent = scorable > 0
     ? `${((correct / scorable) * 100).toFixed(1)}%`
     : '—%';
 
   // Score banner
   if (scorable >= 5) {
-    const pct   = correct / scorable;
+    const pct = correct / scorable;
     const level = SCORE_THRESHOLDS.find(t => pct >= t.min);
     DOM.scoreInterpretation.textContent = level?.label ?? '';
     DOM.scoreBanner.className = `score-banner ${level?.cls ?? ''}`;
@@ -1048,9 +1048,9 @@ function exportResultsCsv() {
     .join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href     = url;
+  link.href = url;
   link.download = `eqthry-results-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.csv`;
   document.body.appendChild(link);
   link.click();
@@ -1101,7 +1101,7 @@ function wireApiKeys() {
     state.savedKeys[name] = keyVal;
     try {
       localStorage.setItem('eq-api-keys', JSON.stringify(state.savedKeys));
-    } catch (_) {}
+    } catch (_) { }
     renderSavedKeys();
     DOM.savedKeysSelect.value = name;
   });
@@ -1121,7 +1121,7 @@ function wireApiKeys() {
       delete state.savedKeys[name];
       try {
         localStorage.setItem('eq-api-keys', JSON.stringify(state.savedKeys));
-      } catch (_) {}
+      } catch (_) { }
       renderSavedKeys();
       DOM.keyNameInput.value = '';
     }
