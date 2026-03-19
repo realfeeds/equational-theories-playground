@@ -21,7 +21,7 @@
       <span class="nav-title">SAIR Playground</span>
     </div>
     <div class="nav-tabs">
-      <button class="nav-tab active" id="tab-run" onclick="switchMainTab('run')">Run</button>
+      <button class="nav-tab active" id="tab-run"     onclick="switchMainTab('run')">Run</button>
       <button class="nav-tab"         id="tab-history" onclick="switchMainTab('history')">History</button>
     </div>
     <div class="nav-right">
@@ -34,111 +34,110 @@
 
   <div id="layout">
 
-    <!-- ═══════════════════════════════ LEFT SIDEBAR ═══════════════════════════════ -->
+    <!-- ════════════════ LEFT SIDEBAR ════════════════ -->
     <aside id="sidebar">
 
-      <!-- Cheatsheet -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Cheatsheet</span>
-          <span id="byte-count" class="byte-pill">0 B</span>
-        </div>
-        <textarea
-          id="cheatsheet-textarea"
-          class="sidebar-textarea"
-          rows="7"
-          placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…"
-          spellcheck="false"
-        ></textarea>
-        <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
-        <div class="byte-progress-track" aria-hidden="true">
-          <div id="byte-progress-fill" class="byte-progress-fill"></div>
-        </div>
-      </div>
+      <!-- Scrollable content (everything except Run row) -->
+      <div id="sidebar-content">
 
-      <!-- Model -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Model</span>
-        </div>
-        <select id="provider-select" class="sidebar-select" aria-label="Provider">
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="xai">xAI (Grok)</option>
-          <option value="google">Google (Gemini)</option>
-          <option value="meta">Meta (Llama via Together)</option>
-        </select>
-        <select id="model-select" class="sidebar-select" aria-label="Model" style="margin-top:6px"></select>
-        <div class="key-row" style="margin-top:6px">
-          <input type="password" id="api-key-input" class="sidebar-input" placeholder="API key…" autocomplete="off" spellcheck="false" />
-          <button id="toggle-key-btn" class="icon-btn" type="button" aria-label="Show/hide API key" title="Show/hide">👁</button>
-        </div>
-      </div>
-
-      <!-- Settings -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Settings</span>
-        </div>
-        <div class="settings-row">
-          <label class="settings-label">Concurrency</label>
-          <div class="settings-control">
-            <input type="range" id="parallelism-slider" min="1" max="5" value="3" step="1" class="mini-slider" />
-            <span id="parallelism-value" class="settings-val">3</span>
+        <!-- Cheatsheet -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span class="sidebar-section-title">Cheatsheet</span>
+            <span id="byte-count" class="byte-pill">0 B</span>
           </div>
-        </div>
-        <div class="settings-row">
-          <label class="settings-label">Max tokens</label>
-          <input type="number" id="max-tokens-input" class="sidebar-input-sm" value="1024" min="128" max="8192" step="128" />
-        </div>
-        <div class="settings-row">
-          <label class="settings-label toggle-label-inline" for="use-cheatsheet-toggle">Use cheatsheet</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="use-cheatsheet-toggle" checked />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Problems -->
-      <div class="sidebar-section sidebar-problems">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Problems</span>
-          <div class="problems-import-row">
-            <button class="mini-btn" id="import-csv-btn" type="button" title="Import CSV">Import</button>
-            <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden-file-input" aria-hidden="true" tabindex="-1" />
-            <button class="mini-btn ghost" id="clear-problems-btn" type="button">Clear</button>
+          <textarea
+            id="cheatsheet-textarea"
+            class="sidebar-textarea"
+            rows="6"
+            placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…"
+            spellcheck="false"
+          ></textarea>
+          <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
+          <div class="byte-progress-track" aria-hidden="true">
+            <div id="byte-progress-fill" class="byte-progress-fill"></div>
           </div>
         </div>
 
-        <div class="search-row">
-          <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
-          <div class="filter-pills" id="filter-pills">
-            <button class="filter-pill active" data-filter="all">all</button>
-            <button class="filter-pill" data-filter="normal">normal</button>
-            <button class="filter-pill" data-filter="hard">hard</button>
+        <!-- Model -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span class="sidebar-section-title">Model</span>
+          </div>
+          <select id="provider-select" class="sidebar-select" aria-label="Provider"></select>
+          <select id="model-select" class="sidebar-select" aria-label="Model" style="margin-top:6px"></select>
+          <div class="key-row" style="margin-top:6px">
+            <input type="password" id="api-key-input" class="sidebar-input" placeholder="API key…" autocomplete="off" spellcheck="false" />
+            <button id="toggle-key-btn" class="icon-btn" type="button" aria-label="Show/hide API key" title="Show/hide">👁</button>
           </div>
         </div>
 
-        <div id="problems-status" class="problems-status">No problems loaded.</div>
-
-        <!-- Selectable problem list -->
-        <div id="problem-list" class="problem-list" role="listbox" aria-multiselectable="true" aria-label="Selectable problems">
-          <div class="problem-list-empty">Import all_problems.csv to begin.</div>
-        </div>
-
-        <!-- Selected summary + controls -->
-        <div id="selected-panel" class="selected-panel hidden">
-          <div class="selected-header">
-            <span id="selected-count" class="selected-count">0 selected</span>
-            <button class="mini-btn ghost" id="clear-sel-btn" type="button">Clear all</button>
-            <button class="mini-btn ghost" id="select-all-btn" type="button">Select all</button>
+        <!-- Settings -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span class="sidebar-section-title">Settings</span>
           </div>
-          <div id="selected-preview" class="selected-preview"></div>
+          <div class="settings-row">
+            <label class="settings-label">Concurrency</label>
+            <div class="settings-control">
+              <input type="range" id="parallelism-slider" min="1" max="5" value="3" step="1" class="mini-slider" />
+              <span id="parallelism-value" class="settings-val">3</span>
+            </div>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Max tokens</label>
+            <input type="number" id="max-tokens-input" class="sidebar-input-sm" value="1024" min="128" max="8192" step="128" />
+          </div>
+          <div class="settings-row">
+            <label class="settings-label toggle-label-inline" for="use-cheatsheet-toggle">Use cheatsheet</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="use-cheatsheet-toggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
-      </div>
 
-      <!-- Run button pinned to bottom of sidebar -->
+        <!-- Problems -->
+        <div class="sidebar-section sidebar-problems">
+          <div class="sidebar-section-header">
+            <span class="sidebar-section-title">Problems</span>
+            <div class="problems-import-row">
+              <button class="mini-btn" id="import-csv-btn" type="button">Import CSV</button>
+              <input type="file" id="csv-file-input" accept=".csv,text/csv" class="hidden-file-input" aria-hidden="true" tabindex="-1" />
+              <button class="mini-btn ghost" id="clear-problems-btn" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div class="search-row">
+            <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
+            <div class="filter-pills" id="filter-pills">
+              <button class="filter-pill active" data-filter="all">all</button>
+              <button class="filter-pill" data-filter="normal">normal</button>
+              <button class="filter-pill" data-filter="hard">hard</button>
+            </div>
+          </div>
+
+          <div id="problems-status" class="problems-status">No problems loaded.</div>
+
+          <!-- Selectable problem list -->
+          <div id="problem-list" class="problem-list" role="listbox" aria-multiselectable="true" aria-label="Selectable problems">
+            <div class="problem-list-empty">Import all_problems.csv to begin.</div>
+          </div>
+
+          <!-- Selected summary -->
+          <div id="selected-panel" class="selected-panel hidden">
+            <div class="selected-header">
+              <span id="selected-count" class="selected-count">0 selected</span>
+              <button class="mini-btn ghost" id="clear-sel-btn" type="button">Clear all</button>
+              <button class="mini-btn ghost" id="select-all-btn" type="button">Select all</button>
+            </div>
+            <div id="selected-preview" class="selected-preview"></div>
+          </div>
+        </div>
+
+      </div><!-- /sidebar-content -->
+
+      <!-- Run row — always pinned at bottom -->
       <div class="sidebar-run-row">
         <button id="stop-btn" class="btn btn-danger" type="button" disabled>■ Stop</button>
         <button id="run-btn" class="btn btn-primary" type="button" disabled>
@@ -148,7 +147,7 @@
 
     </aside>
 
-    <!-- ═══════════════════════════════ MAIN AREA ═══════════════════════════════ -->
+    <!-- ════════════════ MAIN: RUN VIEW ════════════════ -->
     <main id="main-area">
 
       <!-- Stats bar -->
@@ -190,17 +189,49 @@
         <span id="score-interpretation"></span>
       </div>
 
-      <!-- Results area: cards -->
+      <!-- Result cards -->
       <div id="results-area">
         <div id="results-empty" class="results-empty">
           <div class="results-empty-icon">∀</div>
           <p>Select problems from the sidebar and press <strong>Run</strong> to start evaluation.</p>
-          <p class="results-empty-hint">Each result will appear here as a card with VERDICT, tokens, cost, and expandable response/prompt.</p>
+          <p class="results-empty-hint">Each result appears as a card with VERDICT, tokens, cost, and expandable response / prompt.</p>
         </div>
         <div id="results-cards"></div>
       </div>
 
     </main>
+
+    <!-- ════════════════ MAIN: HISTORY VIEW ════════════════ -->
+    <div id="history-view" class="hidden">
+
+      <div class="history-header">
+        <div class="history-title-row">
+          <h2 class="history-title">Operation History</h2>
+          <span id="history-count-badge" class="history-count-badge">0 results</span>
+        </div>
+        <div class="history-filter-row">
+          <div class="history-status-tabs" id="history-status-tabs">
+            <button class="history-status-tab active" data-status="all">All</button>
+            <button class="history-status-tab" data-status="done">Done</button>
+            <button class="history-status-tab" data-status="stopped">Cancelled</button>
+            <button class="history-status-tab" data-status="error">Failed</button>
+          </div>
+          <div class="history-filter-controls">
+            <select id="history-filter-model" class="history-select">
+              <option value="">All Models</option>
+            </select>
+            <button class="mini-btn ghost" id="clear-history-btn" type="button">Clear history</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="history-list" class="history-list">
+        <div id="history-empty" class="history-empty">
+          No evaluation history yet. Run an evaluation to see it here.
+        </div>
+      </div>
+
+    </div><!-- /history-view -->
 
   </div><!-- /layout -->
 

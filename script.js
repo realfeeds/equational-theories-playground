@@ -67,6 +67,10 @@ const state = {
 
   running: false,
   abortController: null,
+
+  /** History of completed runs (persisted to localStorage) */
+  history: [],
+  historyFilter: { status: 'all', model: '' },
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -174,6 +178,11 @@ function cacheDom() {
     'score-banner', 'score-interpretation',
     'results-area', 'results-empty', 'results-cards',
     'export-csv-btn',
+    // Layout roots (for tab switching)
+    'sidebar', 'main-area',
+    // History view
+    'history-view', 'history-list', 'history-count-badge',
+    'history-status-tabs', 'history-filter-model', 'clear-history-btn',
     // Modals
     'prompt-modal-overlay', 'prompt-modal-close', 'prompt-modal-content',
     'log-modal-overlay', 'log-modal-close', 'log-modal-title', 'log-modal-meta', 'log-modal-content',
@@ -251,6 +260,27 @@ function wireUi() {
       closeModal('logModalOverlay');
     }
   });
+
+  // History filters
+  DOM.historyStatusTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('.history-status-tab');
+    if (!tab) return;
+    document.querySelectorAll('.history-status-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.historyFilter.status = tab.dataset.status;
+    renderHistory();
+  });
+  DOM.historyFilterModel.addEventListener('change', () => {
+    state.historyFilter.model = DOM.historyFilterModel.value;
+    renderHistory();
+  });
+  DOM.clearHistoryBtn.addEventListener('click', () => {
+    if (confirm('Clear all history? This cannot be undone.')) {
+      state.history = [];
+      try { localStorage.removeItem('eq-history'); } catch (_) {}
+      renderHistory();
+    }
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -260,8 +290,10 @@ function wireUi() {
 function init() {
   cacheDom();
   wireUi();
+  populateProviderSelect();
   populateModelSelect(DOM.providerSelect.value);
   updateByteCounter();
+  loadHistory();
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -273,12 +305,32 @@ document.addEventListener('DOMContentLoaded', init);
 function switchMainTab(tab) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById(`tab-${tab}`)?.classList.add('active');
-  // Future: show/hide history panel
+
+  const layout = document.getElementById('layout');
+  if (tab === 'history') {
+    layout.classList.add('history-active');
+    renderHistory();
+    updateHistoryModelFilter();
+  } else {
+    layout.classList.remove('history-active');
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    7. PROVIDER / MODEL SELECT
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Populates the provider <select> from PROVIDER_CATALOGUE */
+function populateProviderSelect() {
+  const sel = DOM.providerSelect;
+  sel.innerHTML = '';
+  Object.entries(PROVIDER_CATALOGUE).forEach(([id, p]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+}
 
 function populateModelSelect(providerId) {
   const provider = PROVIDER_CATALOGUE[providerId];
@@ -686,6 +738,9 @@ async function startEvaluation() {
   const aborted = state.abortController.signal.aborted;
   setStatusBadge(aborted ? 'idle' : 'done', aborted ? 'STOPPED' : 'DONE');
   DOM.exportCsvBtn.disabled = state.results.length === 0;
+
+  // Save this run to history
+  saveToHistory(providerId, modelId, aborted ? 'stopped' : 'done');
 }
 
 function stopEvaluation() {
@@ -1003,3 +1058,197 @@ function escHtml(str) {
 }
 
 /* ─── End of script.js ─── */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   21. HISTORY SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Load persisted history from localStorage on startup. */
+function loadHistory() {
+  try {
+    const saved = localStorage.getItem('eq-history');
+    if (saved) state.history = JSON.parse(saved);
+  } catch (_) {}
+}
+
+/**
+ * Save the current run to history and persist to localStorage.
+ * @param {string} providerId
+ * @param {string} modelId
+ * @param {'done'|'stopped'|'error'} runStatus
+ */
+function saveToHistory(providerId, modelId, runStatus) {
+  if (!state.results.length) return;
+
+  const doneResults = state.results.filter(r => r.status === 'done');
+  const correct  = doneResults.filter(r => r.correct === true).length;
+  const scorable = doneResults.filter(r => r.correct !== null).length;
+  const totalCost = state.results.reduce((s, r) => s + (r.cost ?? 0), 0);
+
+  const entry = {
+    id:        Date.now(),
+    timestamp: new Date().toISOString(),
+    provider:  providerId,
+    model:     modelId,
+    status:    runStatus,
+    total:     state.results.length,
+    doneCount: doneResults.length,
+    correct,
+    scorable,
+    accuracy:  scorable > 0 ? correct / scorable : null,
+    totalCost,
+    // Store a lightweight copy (rawResponse can be large — keep it for drilldown)
+    results: state.results.map(r => ({
+      problemIdx:  r.problemIdx,
+      eq1:         r.eq1,
+      eq2:         r.eq2,
+      difficulty:  r.difficulty,
+      groundTruth: r.groundTruth,
+      prediction:  r.prediction,
+      correct:     r.correct,
+      status:      r.status,
+      tokens:      r.tokens,
+      cost:        r.cost,
+    })),
+  };
+
+  state.history.unshift(entry); // newest first
+
+  try {
+    // Keep at most 100 entries in storage (avoid quota errors)
+    localStorage.setItem('eq-history', JSON.stringify(state.history.slice(0, 100)));
+  } catch (_) {}
+}
+
+/** Returns history entries matching the active filters. */
+function getFilteredHistory() {
+  return state.history.filter(entry => {
+    if (state.historyFilter.status !== 'all' && entry.status !== state.historyFilter.status) return false;
+    if (state.historyFilter.model && entry.model !== state.historyFilter.model) return false;
+    return true;
+  });
+}
+
+/** Populate the "All Models" filter dropdown with unique models seen in history. */
+function updateHistoryModelFilter() {
+  const sel = DOM.historyFilterModel;
+  const current = sel.value;
+  const models = [...new Set(state.history.map(e => e.model))].sort();
+
+  sel.innerHTML = '<option value="">All Models</option>';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = m;
+    if (m === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+/** Render the history list into #history-list */
+function renderHistory() {
+  const filtered = getFilteredHistory();
+
+  DOM.historyCountBadge.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`;
+
+  if (!filtered.length) {
+    DOM.historyList.innerHTML = '<div class="history-empty">No matching history entries.</div>';
+    return;
+  }
+
+  DOM.historyList.innerHTML = '';
+  filtered.forEach((entry, idx) => {
+    const div = document.createElement('div');
+    div.className = 'history-row';
+
+    const statusLabel = { done: 'DONE', stopped: 'CANCELLED', error: 'FAILED' }[entry.status] ?? 'DONE';
+
+    const accuracyStr = entry.accuracy != null
+      ? `${entry.correct}/${entry.scorable} (${(entry.accuracy * 100).toFixed(1)}%)`
+      : `${entry.doneCount}/${entry.total}`;
+    const costStr  = entry.totalCost > 0 ? `$${entry.totalCost.toFixed(4)}` : '$0.0000';
+    const pending  = entry.total - entry.doneCount;
+    const timeStr  = new Date(entry.timestamp).toLocaleString();
+
+    div.innerHTML = `
+      <div class="history-row-main">
+        <div class="history-row-left">
+          <span class="history-status-badge ${entry.status}">${statusLabel}</span>
+          <div class="history-row-info">
+            <div class="history-model-name">${escHtml(entry.provider)}/${escHtml(entry.model)}</div>
+            <div class="history-row-meta">${entry.total} problem${entry.total !== 1 ? 's' : ''} · ${entry.doneCount} evaluated</div>
+          </div>
+        </div>
+        <div class="history-row-stats">
+          <div class="history-stat">
+            <span class="history-stat-val">${accuracyStr}</span>
+            <span class="history-stat-label">correct</span>
+          </div>
+          <div class="history-stat">
+            <span class="history-stat-val">${costStr}</span>
+            <span class="history-stat-label">cost</span>
+          </div>
+          <div class="history-stat">
+            <span class="history-stat-val">${pending}</span>
+            <span class="history-stat-label">pending</span>
+          </div>
+          <div class="history-row-time">${escHtml(timeStr)}</div>
+          <button class="history-expand-btn" onclick="toggleHistoryExpand(${idx})" aria-label="Expand" title="Show details">▼</button>
+        </div>
+      </div>
+      <div class="history-expanded-content hidden" id="hist-expand-${idx}">
+        ${renderHistoryExpanded(entry)}
+      </div>
+    `;
+
+    DOM.historyList.appendChild(div);
+  });
+}
+
+/** Toggle the expanded detail table on a history row. */
+function toggleHistoryExpand(idx) {
+  const content = document.getElementById(`hist-expand-${idx}`);
+  if (!content) return;
+  const isHidden = content.classList.toggle('hidden');
+  // Update the chevron on the button
+  const btn = content.previousElementSibling?.querySelector('.history-expand-btn');
+  if (btn) btn.textContent = isHidden ? '▼' : '▲';
+}
+
+/** Renders the inner per-problem detail table for a history entry. */
+function renderHistoryExpanded(entry) {
+  if (!entry.results?.length) {
+    return '<div class="hist-no-results">No result details stored.</div>';
+  }
+
+  const rows = entry.results.map(r => {
+    const rowClass = r.correct === true ? 'hist-r-correct' : r.correct === false ? 'hist-r-wrong' : '';
+    const predCls  = r.prediction === 'TRUE' ? 'pred-true' : r.prediction === 'FALSE' ? 'pred-false' : 'pred-na';
+    const truthCls = r.groundTruth === 'TRUE' ? 'pred-true' : r.groundTruth === 'FALSE' ? 'pred-false' : 'pred-na';
+    const corrText = r.correct === true ? '✓' : r.correct === false ? '✗' : '—';
+    return `
+      <tr class="${rowClass}">
+        <td>#${r.problemIdx + 1}</td>
+        <td title="${escHtml(r.eq1)}">${escHtml(r.eq1.length > 32 ? r.eq1.slice(0, 32) + '…' : r.eq1)}</td>
+        <td title="${escHtml(r.eq2)}">${escHtml(r.eq2.length > 32 ? r.eq2.slice(0, 32) + '…' : r.eq2)}</td>
+        <td class="${predCls}">${r.prediction || '—'}</td>
+        <td class="${truthCls}">${r.groundTruth || '—'}</td>
+        <td>${corrText}</td>
+        <td>${r.status}</td>
+        <td>${r.tokens ?? '—'}</td>
+        <td>${r.cost != null ? '$' + r.cost.toFixed(5) : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <table class="history-detail-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Equation 1</th><th>Equation 2</th>
+          <th>Verdict</th><th>Expected</th><th>✓</th>
+          <th>Status</th><th>Tokens</th><th>Cost</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
