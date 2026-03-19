@@ -1,7 +1,7 @@
 # Technical Specification
 
 **Equational Theories Playground**  
-Version 1.1
+Version 1.1.3
 
 ---
 
@@ -78,9 +78,6 @@ All keys are securely contained inside the `eq-api-keys` context on your `localS
 ## 5. Scoring Specification
 
 **Metric:** Accuracy (correct answers divided by total answerable answers).
-
-Run evaluation chunks are stored persistently into your user data under the `eq-history` `localStorage` object.
-These histories provide comprehensive review records consisting of prompt inputs, full output text logs, time/cost stats, verified assertions, expected evaluation outputs against `answer`, and the active selected evaluation model.
 
 ---
 

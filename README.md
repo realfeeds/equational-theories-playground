@@ -14,7 +14,6 @@ This playground is an interactive evaluation environment for testing heuristics 
 
 - **Batch Evaluation:** Test multiple problems in parallel with configurable concurrency.
 - **Live User Interface:** Track processing progress, accuracy, and see individual problem evaluation results.
-- **History Tracking:** All evaluation runs are saved locally with logs, giving you access to all model verdicts and metrics.
 - **Save API Keys:** Manage your API keys across multiple providers out of local storage safely.
 - **Token & Cost Estimator:** Real-time visibility into your test run's cost dynamically estimated via usage reporting.
 
@@ -76,4 +75,3 @@ Supported API providers (Direct via Browser):
 2. **Add Context:** Paste heuristics or rules into the Cheatsheet text area to enrich the prompt context.
 3. **Configure Settings:** Input your API Key, select the target Model, and set maximum parallel executions.
 4. **Evaluate:** Press **Run** and watch the results dynamically populate. The evaluator extracts the `VERDICT` output to match against expected true/false answers.
-5. **Review History:** Browse your Historical Logs tab to track progression.

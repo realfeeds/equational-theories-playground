@@ -24,11 +24,10 @@
       <div class="nav-brand">
         <span class="nav-logo">∀</span>
         <span class="nav-title">Equational Theories Playground</span>
-        <span class="nav-version">v1.1.1</span>
+        <span class="nav-version">v1.1.3</span>
       </div>
       <div class="nav-tabs">
-        <button class="nav-tab active" id="tab-run" onclick="switchMainTab('run')">Run</button>
-        <button class="nav-tab" id="tab-history" onclick="switchMainTab('history')">History</button>
+        <span class="nav-tab active" id="tab-run">Run</span>
       </div>
       <div class="nav-right">
         <div id="status-badge" class="badge badge-idle" aria-live="polite">
@@ -221,39 +220,6 @@
         </div>
 
       </main>
-
-      <!-- ════════════════ MAIN: HISTORY VIEW ════════════════ -->
-      <div id="history-view" class="hidden">
-
-        <div class="history-header">
-          <div class="history-title-row">
-            <h2 class="history-title">Operation History</h2>
-            <span id="history-count-badge" class="history-count-badge">0 results</span>
-          </div>
-          <div class="history-filter-row">
-            <div class="history-status-tabs" id="history-status-tabs">
-              <button class="history-status-tab active" data-status="all">All</button>
-              <button class="history-status-tab" data-status="done">Done</button>
-              <button class="history-status-tab" data-status="stopped">Cancelled</button>
-              <button class="history-status-tab" data-status="error">Failed</button>
-            </div>
-            <div class="history-filter-controls">
-              <select id="history-filter-model" class="history-select">
-                <option value="">All Models</option>
-              </select>
-              <button class="mini-btn ghost" id="clear-history-btn" type="button">Clear history</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="history-list" class="history-list">
-          <div id="history-empty" class="history-empty">
-            No evaluation history yet. Run an evaluation to see it here.
-          </div>
-        </div>
-
-      </div><!-- /history-view -->
-
     </div><!-- /layout -->
 
   </div><!-- /app-shell -->
