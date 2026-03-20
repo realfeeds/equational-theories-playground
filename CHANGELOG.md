@@ -2,6 +2,11 @@
 
 All notable changes to the Equational Theories Playground will be documented in this file.
 
+## v1.2.1
+- Feature: Added an `Auto-retry errors` toggle that automatically triggers a 60-second countdown to re-run any failed API server requests due to rate limits or connection issues.
+- Feature: Added Cheatsheet name tracking to Run History items in the sidebar.
+- UI Improvement: Changed result card side-borders to color correctly based on model accuracy rather than the raw output prediction.
+
 ## v1.2.0
 - Extracted hardcoded prompt mechanics into a fully UI-editable Prompt Template format.
 - Mapped system template placeholders (`{equation1}`, `{equation2}`, and `{cheatsheet}`).

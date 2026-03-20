@@ -82,6 +82,9 @@ const state = {
   activeTab: 'run',
   history: [],
   historyViewingRun: null,
+
+  autoRetryTimer: null,
+  autoRetryTimeLeft: 0,
 };
 
 function getActiveResults() {
@@ -202,7 +205,7 @@ function cacheDom() {
     // Layout roots (for tab switching)
     'tab-run', 'tab-history', 'sidebar-run-view', 'sidebar-history-view',
     'history-list', 'clear-history-btn',
-    'sidebar', 'main-area',
+    'sidebar', 'main-area', 'auto-retry-checkbox', 'retry-countdown',
     // Saved API keys
     'saved-keys-select', 'load-key-btn', 'delete-key-btn', 'key-name-input', 'save-key-btn',
     // Cheatsheet
@@ -298,7 +301,7 @@ function wireUi() {
   });
 
   // Run / stop
-  DOM.runBtn.addEventListener('click', startEvaluation);
+  DOM.runBtn.addEventListener('click', () => startEvaluation(false));
   DOM.stopBtn.addEventListener('click', stopEvaluation);
 
   // Export
@@ -814,7 +817,15 @@ function extractAnswer(responseText) {
    14. EVALUATION RUN
    ═══════════════════════════════════════════════════════════════════════════ */
 
-async function startEvaluation() {
+async function startEvaluation(isRetry = false) {
+  if (state.running) return;
+  
+  if (state.autoRetryTimer) {
+    clearInterval(state.autoRetryTimer);
+    state.autoRetryTimer = null;
+    DOM.retryCountdown.classList.add('hidden');
+  }
+
   const apiKey = DOM.apiKeyInput.value.trim();
   if (!apiKey) { alert('Please enter an API key.'); DOM.apiKeyInput.focus(); return; }
   if (state.selectedIndices.size === 0) { alert('Select at least one problem.'); return; }
@@ -826,42 +837,56 @@ async function startEvaluation() {
   const modelId = DOM.modelSelect.value;
   const cheatsheet = DOM.cheatsheetTextarea.value;
 
-  // Build results array
-  state.results = selectedSorted.map(idx => {
-    const p = state.problems[idx];
-    return {
-      problemIdx: idx,
-      eq1: p.eq1,
-      eq2: p.eq2,
-      difficulty: p.difficulty,
-      groundTruth: p.groundTruth,
-      prediction: '',
-      correct: null,
-      status: 'pending',
-      rawResponse: '',
-      errorMsg: '',
-      prompt: buildPrompt(p, cheatsheet),
-      elapsed: null,
-      tokens: null,
-      cost: null,
-    };
-  });
+  if (!isRetry) {
+    // Build initial results array
+    state.results = selectedSorted.map(idx => {
+      const p = state.problems[idx];
+      return {
+        problemIdx: idx,
+        eq1: p.eq1,
+        eq2: p.eq2,
+        difficulty: p.difficulty,
+        groundTruth: p.groundTruth,
+        prediction: '',
+        correct: null,
+        status: 'pending',
+        rawResponse: '',
+        errorMsg: '',
+        prompt: buildPrompt(p, cheatsheet),
+        elapsed: null,
+        tokens: null,
+        cost: null,
+      };
+    });
+    DOM.resultsEmpty.classList.add('hidden');
+    DOM.resultsCards.innerHTML = '';
+    state.results.forEach((_, i) => createCard(i));
+  } else {
+    // Reset any errored results back to pending state for a retry
+    state.results.forEach((r, i) => {
+      if (r.status === 'error') {
+        r.status = 'pending';
+        r.errorMsg = '';
+        r.rawResponse = '';
+        r.correct = null;
+        updateCard(i);
+      }
+    });
+  }
 
   state.running = true;
   state.abortController = new AbortController();
 
   // UI setup
-  DOM.resultsEmpty.classList.add('hidden');
-  DOM.resultsCards.innerHTML = '';
   DOM.runBtn.disabled = true;
   DOM.stopBtn.disabled = false;
   setStatusBadge('running', 'RUNNING');
   DOM.evalProgressWrap.classList.remove('hidden');
-  updateProgress(0, state.results.length);
+  updateProgress(
+    state.results.filter(r => r.status === 'done' || r.status === 'skipped').length,
+    state.results.length
+  );
   updateStats();
-
-  // Render all cards in pending state
-  state.results.forEach((_, i) => createCard(i));
 
   await runBatch(state.results, providerId, modelId, apiKey, maxTokens, parallelism);
 
@@ -873,13 +898,39 @@ async function startEvaluation() {
   setStatusBadge(aborted ? 'idle' : 'done', aborted ? 'STOPPED' : 'DONE');
   DOM.exportCsvBtn.disabled = state.results.length === 0;
 
-  // Save to history on completion unless aborted entirely without running
-  if (state.results.length > 0) {
+  const errors = state.results.filter(r => r.status === 'error');
+  if (!aborted && errors.length > 0 && DOM.autoRetryCheckbox.checked) {
+    beginAutoRetry();
+  } else if (state.results.length > 0) {
+    // Only save to history once the entire run is completed without any pending retries.
     saveRunToHistory();
   }
 }
 
+function beginAutoRetry() {
+  state.autoRetryTimeLeft = 60;
+  DOM.retryCountdown.textContent = `${state.autoRetryTimeLeft}s`;
+  DOM.retryCountdown.classList.remove('hidden');
+  
+  state.autoRetryTimer = setInterval(() => {
+    state.autoRetryTimeLeft--;
+    if (state.autoRetryTimeLeft <= 0) {
+      clearInterval(state.autoRetryTimer);
+      state.autoRetryTimer = null;
+      DOM.retryCountdown.classList.add('hidden');
+      startEvaluation(true); // IsRetry = true
+    } else {
+      DOM.retryCountdown.textContent = `${state.autoRetryTimeLeft}s`;
+    }
+  }, 1000);
+}
+
 function stopEvaluation() {
+  if (state.autoRetryTimer) {
+    clearInterval(state.autoRetryTimer);
+    state.autoRetryTimer = null;
+    DOM.retryCountdown.classList.add('hidden');
+  }
   state.abortController?.abort();
   state.running = false;
   DOM.runBtn.disabled = state.selectedIndices.size === 0;
@@ -894,6 +945,8 @@ async function runBatch(results, providerId, modelId, apiKey, maxTokens, paralle
 
   const runOne = async (i) => {
     const result = results[i];
+    if (result.status !== 'pending') return;
+
     result.status = 'running';
     updateCard(i);
 
@@ -977,8 +1030,8 @@ function updateCard(i) {
   // Card-level border class
   let cardClass = 'result-card';
   if (r.status === 'running' || r.status === 'pending') cardClass += ' status-running';
-  if (r.status === 'done' && r.prediction === 'TRUE') cardClass += ' verdict-true';
-  if (r.status === 'done' && r.prediction === 'FALSE') cardClass += ' verdict-false';
+  if (r.status === 'done' && r.correct === true) cardClass += ' correct-true';
+  if (r.status === 'done' && r.correct === false) cardClass += ' correct-false';
 
   // Metrics
   const timeStr = r.elapsed != null ? `${(r.elapsed / 1000).toFixed(1)}s` : '—';
@@ -1581,11 +1634,13 @@ function saveRunToHistory() {
   
   const providerId = DOM.providerSelect.value;
   const modelId = DOM.modelSelect.value;
+  const cheatsheetName = DOM.savedCheatsheetsSelect.value || (DOM.cheatsheetTextarea.value.trim() ? "Custom / Unsaved" : "None");
   
   const runObj = {
     id: 'run_' + Date.now(),
     timestamp: Date.now(),
     modelId: modelId,
+    cheatsheetName: cheatsheetName,
     accuracy: accuracy,
     scorable: scorable,
     total: total,
@@ -1627,6 +1682,7 @@ function renderHistoryList() {
     
     div.innerHTML = `
       <div class="history-title">${run.modelId}</div>
+      <div style="font-size: 0.72rem; color: var(--text-3); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 ${run.cheatsheetName || 'Unknown'}</div>
       <div class="history-meta">
         <span>${dateStr}</span>
         <span style="color: ${run.accuracy >= 0.53 ? 'var(--green)' : 'var(--text-2)'}; font-weight:600;">${pct}</span>

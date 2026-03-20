@@ -1038,11 +1038,11 @@ body {
   border-color: rgba(0, 229, 200, 0.25);
 }
 
-.result-card.verdict-true {
+.result-card.correct-true {
   border-left: 3px solid var(--green);
 }
 
-.result-card.verdict-false {
+.result-card.correct-false {
   border-left: 3px solid var(--red);
 }
 
