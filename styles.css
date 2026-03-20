@@ -182,6 +182,45 @@ body {
   /* clips the sidebar as a whole */
 }
 
+.history-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+  cursor: pointer;
+  transition: all var(--trans);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-acc);
+}
+
+.history-item.active {
+  background: var(--bg-selected);
+  border-color: var(--cyan);
+}
+
+.history-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 0.72rem;
+  color: var(--text-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 /* Scrollable area inside the sidebar (everything above the Run row) */
 #sidebar-content {
   flex: 1;

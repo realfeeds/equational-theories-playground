@@ -27,7 +27,8 @@
         <span class="nav-version">v1.2.0</span>
       </div>
       <div class="nav-tabs">
-        <span class="nav-tab active" id="tab-run">Run</span>
+        <span class="nav-tab active" id="tab-run" data-tab="run">Run</span>
+        <span class="nav-tab" id="tab-history" data-tab="history">History</span>
       </div>
       <div class="nav-right">
         <div id="status-badge" class="badge badge-idle" aria-live="polite">
@@ -42,8 +43,10 @@
       <!-- ════════════════ LEFT SIDEBAR ════════════════ -->
       <aside id="sidebar">
 
-        <!-- Scrollable content (everything except Run row) -->
-        <div id="sidebar-content">
+        <!-- RUN VIEW -->
+        <div id="sidebar-run-view" class="sidebar-view active" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+          <!-- Scrollable content (everything except Run row) -->
+          <div id="sidebar-content">
 
           <!-- Prompt Template -->
           <div class="sidebar-section">
@@ -172,6 +175,22 @@
             ▶ Run (<span id="run-count">0</span>)
           </button>
         </div>
+        </div><!-- /sidebar-run-view -->
+
+        <!-- HISTORY VIEW -->
+        <div id="sidebar-history-view" class="sidebar-view hidden" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+          <div class="sidebar-section">
+            <div class="sidebar-section-header">
+              <span class="sidebar-section-title">Saved Runs</span>
+            </div>
+          </div>
+          <div id="history-list" class="history-list" style="flex:1; overflow-y:auto; padding: 12px; display:flex; flex-direction:column; gap:8px;">
+            <div class="history-empty" style="color:var(--text-3); font-size:0.8rem; text-align:center; padding:20px 0;">No history yet.</div>
+          </div>
+          <div class="sidebar-run-row" style="border-top: 1px solid var(--border);">
+            <button id="clear-history-btn" class="btn btn-danger ghost" type="button" style="width:100%">🗑 Clear History</button>
+          </div>
+        </div><!-- /sidebar-history-view -->
 
       </aside>
 

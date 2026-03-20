@@ -79,7 +79,15 @@ const state = {
   running: false,
   abortController: null,
 
+  activeTab: 'run',
+  history: [],
+  historyViewingRun: null,
 };
+
+function getActiveResults() {
+  if (state.activeTab === 'history' && state.historyViewingRun) return state.historyViewingRun.results;
+  return state.results;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    3. PROVIDER CATALOGUE
@@ -192,6 +200,8 @@ function cacheDom() {
     'results-area', 'results-empty', 'results-cards',
     'export-csv-btn',
     // Layout roots (for tab switching)
+    'tab-run', 'tab-history', 'sidebar-run-view', 'sidebar-history-view',
+    'history-list', 'clear-history-btn',
     'sidebar', 'main-area',
     // Saved API keys
     'saved-keys-select', 'load-key-btn', 'delete-key-btn', 'key-name-input', 'save-key-btn',
@@ -315,6 +325,10 @@ function wireUi() {
     }
   });
 
+  // Tabs
+  DOM.tabRun.addEventListener('click', () => switchTab('run'));
+  DOM.tabHistory.addEventListener('click', () => switchTab('history'));
+
   DOM.openCheatsheetBtn.addEventListener('click', () => {
     openModal('cheatsheetModalOverlay');
     DOM.cheatsheetModalTextarea.focus();
@@ -364,6 +378,9 @@ function wireUi() {
 
   // Saved Prompts
   wirePrompts();
+
+  // History
+  wireHistory();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -378,6 +395,7 @@ function init() {
   initApiKeys();
   initCheatsheets();
   initPrompts();
+  initHistory();
   loadStoredData();
   updateByteCounter();
 }
@@ -854,6 +872,11 @@ async function startEvaluation() {
   const aborted = state.abortController.signal.aborted;
   setStatusBadge(aborted ? 'idle' : 'done', aborted ? 'STOPPED' : 'DONE');
   DOM.exportCsvBtn.disabled = state.results.length === 0;
+
+  // Save to history on completion unless aborted entirely without running
+  if (state.results.length > 0) {
+    saveRunToHistory();
+  }
 }
 
 function stopEvaluation() {
@@ -929,7 +952,7 @@ function createCard(i) {
 }
 
 function updateCard(i) {
-  const r = state.results[i];
+  const r = getActiveResults()[i];
   const div = document.getElementById(`card-${i}`);
   if (!div) return;
 
@@ -1028,17 +1051,18 @@ function toggleCardDetail(i, _type) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function updateStats() {
-  const total = state.results.length;
-  const done = state.results.filter(r => r.status === 'done').length;
-  const errors = state.results.filter(r => r.status === 'error').length;
-  const correct = state.results.filter(r => r.correct === true).length;
-  const scorable = state.results.filter(r => r.correct !== null).length;
+  const activeRes = getActiveResults();
+  const total = activeRes.length;
+  const done = activeRes.filter(r => r.status === 'done').length;
+  const errors = activeRes.filter(r => r.status === 'error').length;
+  const correct = activeRes.filter(r => r.correct === true).length;
+  const scorable = activeRes.filter(r => r.correct !== null).length;
   const remaining = total - done - errors;
 
-  const tp = state.results.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'TRUE').length;
-  const tn = state.results.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'FALSE').length;
-  const fp = state.results.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'TRUE').length;
-  const fn = state.results.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'FALSE').length;
+  const tp = activeRes.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'TRUE').length;
+  const tn = activeRes.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'FALSE').length;
+  const fp = activeRes.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'TRUE').length;
+  const fn = activeRes.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'FALSE').length;
 
   DOM.statTotal.textContent = total;
   DOM.statDoneToday.textContent = done;
@@ -1087,7 +1111,7 @@ function closeModal(domKey) {
 
 /** Show prompt preview modal for result i */
 function showPromptModal(i) {
-  const r = state.results[i];
+  const r = getActiveResults()[i];
   if (!r) return;
   DOM.promptModalContent.textContent = r.prompt || buildPrompt(
     { eq1: r.eq1, eq2: r.eq2 },
@@ -1098,7 +1122,7 @@ function showPromptModal(i) {
 
 /** Show full raw AI log modal for result i */
 function showLogModal(i) {
-  const r = state.results[i];
+  const r = getActiveResults()[i];
   if (!r) return;
   DOM.logModalTitle.textContent = `Problem #${r.problemIdx + 1} — Raw AI Output`;
   DOM.logModalMeta.innerHTML = `
@@ -1127,7 +1151,8 @@ function setStatusBadge(badgeState, label) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function exportResultsCsv() {
-  if (!state.results.length) return;
+  const activeRes = getActiveResults();
+  if (!activeRes.length) return;
 
   const COLUMNS = [
     'problem_num', 'eq1', 'eq2', 'difficulty',
@@ -1135,7 +1160,7 @@ function exportResultsCsv() {
     'tokens', 'cost', 'elapsed_ms', 'raw_response',
   ];
 
-  const rows = state.results.map(r => [
+  const rows = activeRes.map(r => [
     r.problemIdx + 1,
     r.eq1, r.eq2, r.difficulty,
     r.groundTruth, r.prediction,
@@ -1438,5 +1463,183 @@ function renderSavedPrompts() {
     DOM.loadPromptBtn.disabled = false;
     DOM.deletePromptBtn.disabled = false;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   25. HISTORY MANAGER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function switchTab(tab) {
+  state.activeTab = tab;
+  DOM.tabRun.classList.toggle('active', tab === 'run');
+  DOM.tabHistory.classList.toggle('active', tab === 'history');
+  
+  if (tab === 'run') {
+    DOM.sidebarRunView.classList.remove('hidden');
+    DOM.sidebarHistoryView.classList.add('hidden');
+    // If we're not running, restore state.results to the screen
+    if (!state.running && state.results.length > 0) {
+      renderActiveResults();
+    } else {
+      // either running or empty
+      DOM.evalProgressWrap.classList.toggle('hidden', state.results.length === 0);
+      DOM.scoreBanner.classList.toggle('hidden', state.results.length === 0);
+      updateStats();
+    }
+  } else {
+    DOM.sidebarRunView.classList.add('hidden');
+    DOM.sidebarHistoryView.classList.remove('hidden');
+    DOM.evalProgressWrap.classList.add('hidden');
+    DOM.scoreBanner.classList.add('hidden');
+    
+    // Clear out run view or show a prompt
+    renderHistoryList();
+    if (state.history.length === 0) {
+      DOM.resultsCards.innerHTML = '';
+      DOM.resultsEmpty.classList.remove('hidden');
+      DOM.resultsEmpty.innerHTML = `
+        <div class="results-empty-icon">🕒</div>
+        <p>No past runs found in History.</p>
+      `;
+    } else {
+      // Check if we are already viewing a run
+      if (!state.historyViewingRun) {
+         DOM.resultsCards.innerHTML = '';
+         DOM.resultsEmpty.classList.remove('hidden');
+         DOM.resultsEmpty.innerHTML = `
+           <div class="results-empty-icon">🕒</div>
+           <p>Select a local run from the left sidebar to view past metrics and raw outputs.</p>
+         `;
+      } else {
+         renderActiveResults();
+      }
+    }
+  }
+}
+
+function renderActiveResults() {
+  DOM.resultsEmpty.classList.add('hidden');
+  DOM.resultsCards.innerHTML = '';
+  // Redraw stats based on getActiveResults
+  updateStats();
+  
+  const results = getActiveResults();
+  if (results.length === 0) {
+    DOM.resultsEmpty.classList.remove('hidden');
+    return;
+  }
+  
+  results.forEach((_, i) => createCard(i));
+  // Call interpretation manually
+  const total = results.length;
+  const correct = results.filter(r => r.correct === true).length;
+  const scorable = results.filter(r => r.correct !== null).length;
+  if(scorable > 0) {
+    const acc = correct / scorable;
+    let text = '';
+    const pct = (acc * 100).toFixed(1);
+    const scoreObj = SCORE_THRESHOLDS.find(t => acc >= t.min);
+    if (scoreObj) {
+      text = `<span class="${scoreObj.cls}">Expected submission score ≈ ${pct}%</span> <span class="dim">| ${scoreObj.label}</span>`;
+    } else {
+      text = `<span class="level-below">Score ≈ ${pct}% </span> <span class="dim">| < 50%</span>`;
+    }
+    DOM.scoreInterpretation.innerHTML = text;
+    DOM.scoreBanner.classList.remove('hidden');
+  } else {
+    DOM.scoreBanner.classList.add('hidden');
+  }
+}
+
+function initHistory() {
+  try {
+    const saved = localStorage.getItem('eq-history');
+    if (saved) state.history = JSON.parse(saved);
+  } catch (_) {
+    state.history = [];
+  }
+}
+
+function wireHistory() {
+  DOM.clearHistoryBtn.addEventListener('click', () => {
+    if (confirm("Are you sure you want to clear your entire run history?")) {
+      state.history = [];
+      state.historyViewingRun = null;
+      try { localStorage.setItem('eq-history', JSON.stringify(state.history)); } catch (e) {}
+      renderHistoryList();
+      switchTab('history'); // forces empty screen refresh
+    }
+  });
+}
+
+function saveRunToHistory() {
+  // Build a compact run object
+  const total = state.results.length;
+  const correct = state.results.filter(r => r.correct === true).length;
+  const scorable = state.results.filter(r => r.correct !== null).length;
+  const accuracy = scorable > 0 ? (correct / scorable) : 0;
+  
+  const providerId = DOM.providerSelect.value;
+  const modelId = DOM.modelSelect.value;
+  
+  const runObj = {
+    id: 'run_' + Date.now(),
+    timestamp: Date.now(),
+    modelId: modelId,
+    accuracy: accuracy,
+    scorable: scorable,
+    total: total,
+    results: JSON.parse(JSON.stringify(state.results))
+  };
+  
+  state.history.unshift(runObj);
+  // Keep last 50 runs to save storage limits
+  if (state.history.length > 50) {
+    state.history.pop();
+  }
+  
+  try {
+    localStorage.setItem('eq-history', JSON.stringify(state.history));
+  } catch (e) {
+    console.error("Failed to save history:", e);
+  }
+}
+
+function renderHistoryList() {
+  const list = DOM.historyList;
+  list.innerHTML = '';
+  
+  if (state.history.length === 0) {
+    list.innerHTML = `<div class="history-empty" style="color:var(--text-3); font-size:0.8rem; text-align:center; padding:20px 0;">No history yet.</div>`;
+    return;
+  }
+  
+  state.history.forEach(run => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    if (state.historyViewingRun && state.historyViewingRun.id === run.id) {
+      div.classList.add('active');
+    }
+    
+    const d = new Date(run.timestamp);
+    const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const pct = run.scorable > 0 ? (run.accuracy * 100).toFixed(1) + '%' : '—';
+    
+    div.innerHTML = `
+      <div class="history-title">${run.modelId}</div>
+      <div class="history-meta">
+        <span>${dateStr}</span>
+        <span style="color: ${run.accuracy >= 0.53 ? 'var(--green)' : 'var(--text-2)'}; font-weight:600;">${pct}</span>
+      </div>
+    `;
+    
+    div.addEventListener('click', () => {
+      state.historyViewingRun = run;
+      renderHistoryList(); // to update active class
+      renderActiveResults();
+    });
+    
+    list.appendChild(div);
+  });
 }
 
