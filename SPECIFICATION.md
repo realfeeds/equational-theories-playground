@@ -123,28 +123,4 @@ Construct a finite magma (usually small, 2-to-3 element domains) satisfying `E1`
 
 ---
 
----
-
-## Changelog
-
-**v1.2.0**
-- Extracted hardcoded prompt mechanics into a UI-editable Prompt Template feature (`{equation1}`, `{equation2}`, and `{cheatsheet}` mapping variables) 
-- Added robust prompt local storage persistence across sessions matching Cheatsheet format
-- Fully deprecated the 'Use Cheatsheet' feature toggle
-- Established `official1` baseline prompt logic
-
-**v1.1.4**
-- Added UI to save and load named Cheatsheets locally
-- Introduced a pop-out modal for editing and managing Cheatsheets more easily
-- Added filter options for problem Ground Truth (`TRUE`/`FALSE`) and Custom Problems
-- Removed deprecated `Criteria Left` UI metric and replaced them with robust Confusion Matrix stats (`TP`, `TN`, `FP`, `FN`)
-- Added heavier Google Gemini models (`Gemini 2.5 Pro`, `Gemini 2.0 Pro Exp`, `Gemini 2.0 Flash Thinking Exp`) for better reasoning capabilities
-
-**v1.1.3**
-- Removed the History Tab
-- Updated models catalogue and scoring logic
-- Consolidated styling and refactored UI
-
----
-
 *This specification applies to the independent playground application. Based on research from the Equational Theories Project.*

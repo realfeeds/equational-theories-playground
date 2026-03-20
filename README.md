@@ -71,28 +71,4 @@ Supported API providers (Direct via Browser):
 1. **Import Problems:** Select a dataset formatted as a `.jsonl` file.
 2. **Add Context:** Paste heuristics or rules into the Cheatsheet text area to enrich the prompt context.
 3. **Configure Settings:** Input your API Key, select the target Model, and set maximum parallel executions.
-4. **Evaluate:** Press **Run** and watch the results dynamically populate. The evaluator extracts the `VERDICT` output to match against expected true/false answers.
-
----
-
-## Changelog
-
-**v1.2.0**
-- Extracted hardcoded prompt mechanics into a fully UI-editable Prompt Template format
-- Mapped system template placeholders (`{equation1}`, `{equation2}`, and `{cheatsheet}`)
-- Replicated save/load local storage functionalities for user-created prompts
-- Deprecated 'Use Cheatsheet' feature toggle
-- Deployed `official1` baseline prompt automatically to client storage
-
-**v1.1.4**
-- Added UI to save and load named Cheatsheets locally
-- Introduced a pop-out modal for editing and managing Cheatsheets more easily
-- Added filter options for problem Ground Truth (`TRUE`/`FALSE`)
-- Added ability to create Custom Problems directly in the UI
-- Removed deprecated UI metrics and replaced them with robust Confusion Matrix stats (`TP`, `TN`, `FP`, `FN`)
-- Added heavier Google Gemini models (`Gemini 2.5 Pro`, `Gemini 2.0 Pro Exp`, `Gemini 2.0 Flash Thinking Exp`) for better reasoning capabilities
-
-**v1.1.3**
-- Removed the History Tab
-- Updated models catalogue and scoring logic
-- Consolidated styling and refactored UI
+ 4. **Evaluate:** Press **Run** and watch the results dynamically populate. The evaluator extracts the `VERDICT` output to match against expected true/false answers.
