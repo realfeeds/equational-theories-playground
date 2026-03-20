@@ -24,7 +24,7 @@
       <div class="nav-brand">
         <span class="nav-logo">∀</span>
         <span class="nav-title">Equational Theories Playground</span>
-        <span class="nav-version">v1.1.3</span>
+        <span class="nav-version">v1.1.4</span>
       </div>
       <div class="nav-tabs">
         <span class="nav-tab active" id="tab-run">Run</span>
@@ -51,10 +51,10 @@
               <span class="sidebar-section-title">Cheatsheet</span>
               <span id="byte-count" class="byte-pill">0 B</span>
             </div>
-            <textarea id="cheatsheet-textarea" class="sidebar-textarea" rows="6"
-              placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…" spellcheck="false"></textarea>
-            <div id="byte-warning" class="byte-warning hidden">⚠ Exceeds 10,240 bytes — will be truncated</div>
-            <div class="byte-progress-track" aria-hidden="true">
+            <textarea id="cheatsheet-textarea" class="sidebar-textarea" rows="6" placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…" spellcheck="false"></textarea>
+            <button id="open-cheatsheet-btn" class="mini-btn ghost" style="margin-top: 6px; width: 100%;" type="button">⤢ Expand &amp; Save / Load...</button>
+            <div id="byte-warning" class="byte-warning hidden" style="margin-top: 6px;">⚠ Exceeds 10,240 bytes</div>
+            <div class="byte-progress-track" aria-hidden="true" style="margin-top: 6px;">
               <div id="byte-progress-fill" class="byte-progress-fill"></div>
             </div>
           </div>
@@ -73,17 +73,15 @@
                 title="Show/hide">👁</button>
             </div>
             <!-- Saved API keys -->
-            <div id="saved-keys-panel" class="saved-keys-panel">
-              <div class="saved-keys-row">
-                <select id="saved-keys-select" class="sidebar-select-sm" title="Saved API keys"></select>
+            <div id="saved-keys-panel" class="saved-keys-panel" style="display: flex; flex-direction: column; gap: 6px; margin-top: 8px;">
+              <div style="display: flex; gap: 4px;">
+                <select id="saved-keys-select" class="sidebar-select-sm" title="Saved API keys" style="flex: 1; min-width: 0;"></select>
                 <button id="load-key-btn" class="mini-btn" type="button" title="Load selected key">Load</button>
                 <button id="delete-key-btn" class="mini-btn ghost" type="button" title="Delete selected key">✕</button>
               </div>
-              <div class="saved-keys-row">
-                <input id="key-name-input" class="sidebar-input-sm" placeholder="Name for current key…"
-                  spellcheck="false" />
-                <button id="save-key-btn" class="mini-btn" type="button"
-                  title="Save current key with name">Save</button>
+              <div style="display: flex; gap: 4px;">
+                <input id="key-name-input" class="sidebar-input-sm" placeholder="Name for key…" spellcheck="false" style="flex: 1; min-width: 0; text-align: left;" />
+                <button id="save-key-btn" class="mini-btn" type="button" title="Save current key with name">Save</button>
               </div>
             </div>
           </div>
@@ -119,6 +117,7 @@
             <div class="sidebar-section-header">
               <span class="sidebar-section-title">Problems</span>
               <div class="problems-import-row">
+                <button class="mini-btn" id="add-custom-btn" type="button">Add Custom</button>
                 <button class="mini-btn" id="import-csv-btn" type="button">Import JSONL</button>
                 <input type="file" id="csv-file-input" accept=".jsonl,.json,application/json" class="hidden-file-input"
                   aria-hidden="true" tabindex="-1" />
@@ -128,10 +127,16 @@
 
             <div class="search-row">
               <input id="problem-search" class="sidebar-input" placeholder='Search (e.g. "x = y" or #3)' type="text" />
-              <div class="filter-pills" id="filter-pills">
-                <button class="filter-pill active" data-filter="all">all</button>
+              <div class="filter-pills" id="filter-pills" style="margin-bottom: 6px;">
+                <button class="filter-pill active" data-filter="all">all diff</button>
                 <button class="filter-pill" data-filter="normal">normal</button>
                 <button class="filter-pill" data-filter="hard">hard</button>
+                <button class="filter-pill" data-filter="custom">custom</button>
+              </div>
+              <div class="filter-pills" id="truth-filter-pills">
+                <button class="filter-pill active" data-truth="all">all truth</button>
+                <button class="filter-pill" data-truth="TRUE">TRUE</button>
+                <button class="filter-pill" data-truth="FALSE">FALSE</button>
               </div>
             </div>
 
@@ -172,24 +177,32 @@
         <!-- Stats bar -->
         <div id="stats-bar">
           <div class="stat-chip">
-            <div class="stat-value" id="stat-remaining">—</div>
-            <div class="stat-label">criteria left</div>
-          </div>
-          <div class="stat-chip">
             <div class="stat-value" id="stat-done-today">—</div>
-            <div class="stat-label">done this run</div>
+            <div class="stat-label">evaluated</div>
           </div>
           <div class="stat-chip">
             <div class="stat-value" id="stat-total">0</div>
-            <div class="stat-label">total tasks</div>
-          </div>
-          <div class="stat-chip">
-            <div class="stat-value" id="stat-correct">0</div>
-            <div class="stat-label">correct</div>
+            <div class="stat-label">tasks</div>
           </div>
           <div class="stat-chip">
             <div class="stat-value" id="stat-accuracy">—%</div>
             <div class="stat-label">accuracy</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value green" id="stat-tp">0</div>
+            <div class="stat-label">TP</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value green" id="stat-tn">0</div>
+            <div class="stat-label">TN</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value red" id="stat-fp">0</div>
+            <div class="stat-label">FP</div>
+          </div>
+          <div class="stat-chip">
+            <div class="stat-value red" id="stat-fn">0</div>
+            <div class="stat-label">FN</div>
           </div>
           <div class="stat-spacer"></div>
           <button class="mini-btn ghost" id="export-csv-btn" type="button" disabled>⬇ Export CSV</button>
@@ -248,6 +261,52 @@
       <div class="modal-meta" id="log-modal-meta"></div>
       <div class="modal-body">
         <pre id="log-modal-content" class="modal-pre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- custom problem modal -->
+  <div id="custom-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Add Custom Problem">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Custom Problem</h3>
+        <button class="modal-close" id="custom-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <label class="settings-label">Equation 1</label>
+        <input id="custom-eq1" class="sidebar-input" placeholder="e.g. x * y = y * x" />
+        <label class="settings-label">Equation 2</label>
+        <input id="custom-eq2" class="sidebar-input" placeholder="e.g. x = y" />
+        <label class="settings-label">Ground Truth</label>
+        <select id="custom-truth" class="sidebar-select">
+          <option value="TRUE">True</option>
+          <option value="FALSE">False</option>
+        </select>
+        <button id="save-custom-btn" class="btn btn-primary" style="margin-top: 10px;" type="button">Add Problem</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cheatsheet modal -->
+  <div id="cheatsheet-modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Edit Cheatsheet">
+    <div class="modal" style="width: 600px; max-width: 90vw;">
+      <div class="modal-header">
+        <h3>Edit Cheatsheet</h3>
+        <button class="modal-close" id="cheatsheet-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 14px; display: flex; flex-direction: column;">
+        <div id="saved-cheatsheets-panel" class="saved-keys-panel" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; gap: 4px;">
+            <select id="saved-cheatsheets-select" class="sidebar-select" title="Saved Cheatsheets" style="flex: 1; min-width: 0;"></select>
+            <button id="load-cheatsheet-btn" class="mini-btn" type="button" title="Load selected cheatsheet">Load</button>
+            <button id="delete-cheatsheet-btn" class="mini-btn ghost" type="button" title="Delete selected cheatsheet">✕</button>
+          </div>
+          <div style="display: flex; gap: 4px;">
+            <input id="cheatsheet-name-input" class="sidebar-input" placeholder="Name for cheatsheet…" spellcheck="false" style="flex: 1; min-width: 0;" />
+            <button id="save-cheatsheet-btn" class="mini-btn" type="button" title="Save current cheatsheet">Save</button>
+          </div>
+        </div>
+        <textarea id="cheatsheet-modal-textarea" class="sidebar-textarea" rows="15" placeholder="Paste plain-text cheatsheet (max 10,240 bytes)…" spellcheck="false" style="flex: 1; min-height: 250px;"></textarea>
       </div>
     </div>
   </div>

@@ -57,6 +57,7 @@ const state = {
   /** Current search/filter */
   searchQuery: '',
   difficultyFilter: 'all',
+  truthFilter: 'all',
 
   /**
    * Results: one per selected problem run
@@ -126,6 +127,9 @@ const PROVIDER_CATALOGUE = {
       { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite' },
       { id: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash Lite Preview (Stage 1)' },
       { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.0-pro-exp-0205', label: 'Gemini 2.0 Pro Exp 0205' },
+      { id: 'gemini-2.0-flash-thinking-exp-0121', label: 'Gemini 2.0 Flash Thinking Exp' },
     ],
     buildBody: (model, messages, maxTokens) => ({
       contents: messages.map(m => ({
@@ -163,16 +167,17 @@ function cacheDom() {
     'use-cheatsheet-toggle',
     'parallelism-slider', 'parallelism-value',
     'max-tokens-input',
-    'import-csv-btn', 'csv-file-input', 'clear-problems-btn',
+    'import-csv-btn', 'csv-file-input', 'clear-problems-btn', 'add-custom-btn',
     'problems-status',
-    'problem-search', 'filter-pills',
+    'problem-search', 'filter-pills', 'truth-filter-pills',
     'problem-list',
     'selected-panel', 'selected-count', 'selected-preview',
     'clear-sel-btn', 'select-all-btn',
     'run-btn', 'stop-btn', 'run-count',
     'status-badge', 'status-text',
     'stats-bar',
-    'stat-remaining', 'stat-done-today', 'stat-total', 'stat-correct', 'stat-accuracy',
+    'stat-done-today', 'stat-total', 'stat-accuracy',
+    'stat-tp', 'stat-tn', 'stat-fp', 'stat-fn',
     'eval-progress-wrap', 'eval-progress-fill', 'eval-progress-label',
     'score-banner', 'score-interpretation',
     'results-area', 'results-empty', 'results-cards',
@@ -181,6 +186,12 @@ function cacheDom() {
     'sidebar', 'main-area',
     // Saved API keys
     'saved-keys-select', 'load-key-btn', 'delete-key-btn', 'key-name-input', 'save-key-btn',
+    // Cheatsheet
+    'open-cheatsheet-btn', 'cheatsheet-modal-overlay', 'cheatsheet-modal-close',
+    'saved-cheatsheets-select', 'load-cheatsheet-btn', 'delete-cheatsheet-btn',
+    'cheatsheet-name-input', 'save-cheatsheet-btn', 'cheatsheet-modal-textarea',
+    // Custom Problem
+    'custom-modal-overlay', 'custom-modal-close', 'custom-eq1', 'custom-eq2', 'custom-truth', 'save-custom-btn',
     // Modals
     'prompt-modal-overlay', 'prompt-modal-close', 'prompt-modal-content',
     'log-modal-overlay', 'log-modal-close', 'log-modal-title', 'log-modal-meta', 'log-modal-content',
@@ -201,7 +212,14 @@ function wireUi() {
     const inp = DOM.apiKeyInput;
     inp.type = inp.type === 'password' ? 'text' : 'password';
   });
-  DOM.cheatsheetTextarea.addEventListener('input', updateByteCounter);
+  DOM.cheatsheetTextarea.addEventListener('input', () => {
+    DOM.cheatsheetModalTextarea.value = DOM.cheatsheetTextarea.value;
+    updateByteCounter();
+  });
+  DOM.cheatsheetModalTextarea.addEventListener('input', () => {
+    DOM.cheatsheetTextarea.value = DOM.cheatsheetModalTextarea.value;
+    updateByteCounter();
+  });
   DOM.parallelismSlider.addEventListener('input', () => {
     DOM.parallelismValue.textContent = DOM.parallelismSlider.value;
   });
@@ -222,9 +240,17 @@ function wireUi() {
   DOM.filterPills.addEventListener('click', (e) => {
     const pill = e.target.closest('.filter-pill');
     if (!pill) return;
-    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    DOM.filterPills.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
     state.difficultyFilter = pill.dataset.filter;
+    renderProblemList();
+  });
+  DOM.truthFilterPills.addEventListener('click', (e) => {
+    const pill = e.target.closest('.filter-pill');
+    if (!pill) return;
+    DOM.truthFilterPills.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    state.truthFilter = pill.dataset.truth;
     renderProblemList();
   });
 
@@ -250,17 +276,62 @@ function wireUi() {
   // Modals
   DOM.promptModalClose.addEventListener('click', () => closeModal('promptModalOverlay'));
   DOM.logModalClose.addEventListener('click', () => closeModal('logModalOverlay'));
+  DOM.cheatsheetModalClose.addEventListener('click', () => closeModal('cheatsheetModalOverlay'));
+  DOM.customModalClose.addEventListener('click', () => closeModal('customModalOverlay'));
   DOM.promptModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.promptModalOverlay) closeModal('promptModalOverlay'); });
   DOM.logModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.logModalOverlay) closeModal('logModalOverlay'); });
+  DOM.cheatsheetModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.cheatsheetModalOverlay) closeModal('cheatsheetModalOverlay'); });
+  DOM.customModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.customModalOverlay) closeModal('customModalOverlay'); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal('promptModalOverlay');
       closeModal('logModalOverlay');
+      closeModal('cheatsheetModalOverlay');
+      closeModal('customModalOverlay');
     }
+  });
+
+  DOM.openCheatsheetBtn.addEventListener('click', () => {
+    openModal('cheatsheetModalOverlay');
+    DOM.cheatsheetModalTextarea.focus();
+  });
+
+  DOM.addCustomBtn.addEventListener('click', () => {
+    openModal('customModalOverlay');
+    DOM.customEq1.focus();
+  });
+
+  DOM.saveCustomBtn.addEventListener('click', () => {
+    const eq1 = DOM.customEq1.value.trim();
+    const eq2 = DOM.customEq2.value.trim();
+    const truth = DOM.customTruth.value;
+    if (!eq1 || !eq2) { alert('Please enter both equations.'); return; }
+    
+    state.problems.push({
+      id: `custom_${Date.now()}`,
+      index: state.problems.length + 1,
+      eq1,
+      eq2,
+      difficulty: 'custom',
+      groundTruth: truth
+    });
+    
+    DOM.customEq1.value = '';
+    DOM.customEq2.value = '';
+    closeModal('customModalOverlay');
+    
+    try { localStorage.setItem('eq-problems', JSON.stringify(state.problems)); } catch (e) { }
+    showProblemsStatus(`✅ ${state.problems.length} problems loaded`);
+    renderProblemList();
+    updateSelectionUI();
+    updateStats();
   });
 
   // Saved API keys
   wireApiKeys();
+
+  // Saved Cheatsheets
+  wireCheatsheets();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -273,6 +344,7 @@ function init() {
   populateProviderSelect();
   populateModelSelect(DOM.providerSelect.value);
   initApiKeys();
+  initCheatsheets();
   loadStoredData();
   updateByteCounter();
 }
@@ -299,6 +371,7 @@ function loadStoredData() {
     const cStr = localStorage.getItem('eq-cheatsheet');
     if (cStr) {
       DOM.cheatsheetTextarea.value = cStr;
+      DOM.cheatsheetModalTextarea.value = cStr;
     }
   } catch (e) { }
 }
@@ -481,10 +554,12 @@ function showProblemsStatus(msg) {
 function getFilteredProblems() {
   const q = state.searchQuery.toLowerCase();
   const diff = state.difficultyFilter;
+  const truth = state.truthFilter;
   return state.problems
     .map((p, idx) => ({ p, idx }))
     .filter(({ p, idx }) => {
       if (diff !== 'all' && p.difficulty !== diff) return false;
+      if (truth !== 'all' && p.groundTruth !== truth) return false;
       if (q) {
         const matchNum = `#${idx + 1}`.includes(q) || String(idx + 1).includes(q);
         const matchEq = p.eq1.toLowerCase().includes(q) || p.eq2.toLowerCase().includes(q);
@@ -935,13 +1010,21 @@ function updateStats() {
   const scorable = state.results.filter(r => r.correct !== null).length;
   const remaining = total - done - errors;
 
+  const tp = state.results.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'TRUE').length;
+  const tn = state.results.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'FALSE').length;
+  const fp = state.results.filter(r => r.groundTruth === 'FALSE' && r.prediction === 'TRUE').length;
+  const fn = state.results.filter(r => r.groundTruth === 'TRUE' && r.prediction === 'FALSE').length;
+
   DOM.statTotal.textContent = total;
-  DOM.statRemaining.textContent = remaining >= 0 ? remaining : '—';
   DOM.statDoneToday.textContent = done;
-  DOM.statCorrect.textContent = correct;
   DOM.statAccuracy.textContent = scorable > 0
     ? `${((correct / scorable) * 100).toFixed(1)}%`
     : '—%';
+
+  DOM.statTp.textContent = tp;
+  DOM.statTn.textContent = tn;
+  DOM.statFp.textContent = fp;
+  DOM.statFn.textContent = fn;
 
   // Score banner
   if (scorable >= 5) {
@@ -1152,3 +1235,85 @@ function renderSavedKeys() {
     DOM.deleteKeyBtn.disabled = false;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   23. CHEATSHEETS MANAGER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+state.savedCheatsheets = {};
+
+function initCheatsheets() {
+  try {
+    const saved = localStorage.getItem('eq-saved-cheatsheets');
+    if (saved) state.savedCheatsheets = JSON.parse(saved);
+  } catch (_) {
+    state.savedCheatsheets = {};
+  }
+  renderSavedCheatsheets();
+}
+
+function wireCheatsheets() {
+  DOM.saveCheatsheetBtn.addEventListener('click', () => {
+    const name = DOM.cheatsheetNameInput.value.trim();
+    const content = DOM.cheatsheetTextarea.value;
+    if (!name) {
+      alert("Please provide a name to save the cheatsheet.");
+      return;
+    }
+    state.savedCheatsheets[name] = content;
+    try {
+      localStorage.setItem('eq-saved-cheatsheets', JSON.stringify(state.savedCheatsheets));
+    } catch (_) { }
+    renderSavedCheatsheets();
+    DOM.savedCheatsheetsSelect.value = name;
+  });
+
+  DOM.loadCheatsheetBtn.addEventListener('click', () => {
+    const name = DOM.savedCheatsheetsSelect.value;
+    if (name && state.savedCheatsheets[name] !== undefined) {
+      DOM.cheatsheetTextarea.value = state.savedCheatsheets[name];
+      DOM.cheatsheetModalTextarea.value = state.savedCheatsheets[name];
+      DOM.cheatsheetNameInput.value = name;
+      updateByteCounter();
+    }
+  });
+
+  DOM.deleteCheatsheetBtn.addEventListener('click', () => {
+    const name = DOM.savedCheatsheetsSelect.value;
+    if (!name) return;
+    if (confirm(`Delete saved cheatsheet "${name}"?`)) {
+      delete state.savedCheatsheets[name];
+      try {
+        localStorage.setItem('eq-saved-cheatsheets', JSON.stringify(state.savedCheatsheets));
+      } catch (_) { }
+      renderSavedCheatsheets();
+      DOM.cheatsheetNameInput.value = '';
+    }
+  });
+}
+
+function renderSavedCheatsheets() {
+  const select = DOM.savedCheatsheetsSelect;
+  select.innerHTML = '';
+  const names = Object.keys(state.savedCheatsheets).sort();
+  if (names.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '-- No saved cheatsheets --';
+    select.appendChild(opt);
+    select.disabled = true;
+    DOM.loadCheatsheetBtn.disabled = true;
+    DOM.deleteCheatsheetBtn.disabled = true;
+  } else {
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      select.appendChild(opt);
+    });
+    select.disabled = false;
+    DOM.loadCheatsheetBtn.disabled = false;
+    DOM.deleteCheatsheetBtn.disabled = false;
+  }
+}
+

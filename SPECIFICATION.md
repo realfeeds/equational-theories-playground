@@ -1,7 +1,7 @@
 # Technical Specification
 
 **Equational Theories Playground**  
-Version 1.1.3
+Version 1.1.4
 
 ---
 
@@ -70,7 +70,7 @@ All keys are securely contained inside the `eq-api-keys` context on your `localS
 - xAI: `grok-4-fast`, `grok-3`, `grok-3-mini`
 - OpenAI: `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-oss-120b`
 - Meta: `meta-llama/Llama-3.3-70B-Instruct`, `meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo`
-- Google: `gemini-2.0-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-2.0-flash`
+- Google: `gemini-2.5-pro`, `gemini-2.0-pro-exp-0205`, `gemini-2.0-flash-thinking-exp-0121`, `gemini-2.0-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-2.0-flash`
 - Anthropic: `claude-opus-4-5`, `claude-sonnet-4-5`, `claude-3-5-sonnet-20241022`, `claude-3-haiku-20240307`
 
 ---
@@ -78,12 +78,13 @@ All keys are securely contained inside the `eq-api-keys` context on your `localS
 ## 5. Scoring Specification
 
 **Metric:** Accuracy (correct answers divided by total answerable answers).
+**Advanced Metrics:** True Positives (TP), True Negatives (TN), False Positives (FP), and False Negatives (FN) matrix built on the fly based on the ground truth mapping.
 
 ---
 
 ## 6. Cheatsheet Specification
 
-**Format:** Plain UTF-8 text.
+**Format:** Plain UTF-8 text. Can be saved and named locally into `localStorage` via `eq-saved-cheatsheets`.
 **Size limit:** Max 10,240 bytes (truncated programmatically if exceeded when the API run initiates).
 
 ### Content Guidance *(useful starting concepts)*
@@ -118,6 +119,24 @@ Standard term rewriting and transitivity techniques apply in algebraic systems l
 
 ### Disproving Implication (`FALSE`)
 Construct a finite magma (usually small, 2-to-3 element domains) satisfying `E1` but failing to satisfy `E2` for at least one case constraint.
+
+---
+
+---
+
+## Changelog
+
+**v1.1.4**
+- Added UI to save and load named Cheatsheets locally
+- Introduced a pop-out modal for editing and managing Cheatsheets more easily
+- Added filter options for problem Ground Truth (`TRUE`/`FALSE`) and Custom Problems
+- Removed deprecated `Criteria Left` UI metric and replaced them with robust Confusion Matrix stats (`TP`, `TN`, `FP`, `FN`)
+- Added heavier Google Gemini models (`Gemini 2.5 Pro`, `Gemini 2.0 Pro Exp`, `Gemini 2.0 Flash Thinking Exp`) for better reasoning capabilities
+
+**v1.1.3**
+- Removed the History Tab
+- Updated models catalogue and scoring logic
+- Consolidated styling and refactored UI
 
 ---
 
