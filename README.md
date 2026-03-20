@@ -16,6 +16,7 @@ This playground is an interactive evaluation environment for testing heuristics 
 - **Live User Interface:** Track processing progress, accuracy, and see individual problem evaluation results.
 - **Advanced Metrics:** View True Positives (TP), True Negatives (TN), False Positives (FP), and False Negatives (FN) for deep performance insights.
 - **Custom Problems:** Inject your own custom equations and expected truth values directly from the UI.
+- **Dynamic Prompt System:** Fully customize the System Prompt directly from the sidebar. You can map `{equation1}`, `{equation2}`, and `{cheatsheet}` parameters exactly where you need them for custom prompting strategies.
 - **Dynamic Filtering:** Filter the problem set by difficulty or by ground truth (`TRUE` or `FALSE`).
 - **Savable Cheatsheets & API Keys:** Manage multiple iterations of prompts and securely store your API keys across multiple providers via Local Storage securely inside your browser. Built-in expandable window for easier cheatsheet editing.
 - **Token & Cost Estimator:** Real-time visibility into your test run's cost dynamically estimated via usage reporting.
@@ -43,19 +44,12 @@ Each line must be a JSON object containing:
 
 ## Prompt Construction
 
-For each problem, the prompt is built as follows:
+For each problem, the base template is built around the internal `official1` structure. You can edit this directly in your sidebar to inject equations anywhere or instruct your chosen model to behave completely differently.
 
-```text
-You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 ({equation1}) implies Equation 2 ({equation2}) over all magmas.
-
-[...CHEATSHEET INJECTED HERE...]
-
-Output format (use exact headers without any additional text or formatting):
-VERDICT: must be exactly TRUE or FALSE (in the same line).
-REASONING: must be non-empty.
-PROOF: required if VERDICT is TRUE, empty otherwise.
-COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.
-```
+**Usage Tags:**
+* `{equation1}` - injects the hypothesis equation
+* `{equation2}` - injects the conclusion equation test case
+* `{cheatsheet}` - injects the full string contents of the Cheatsheet text field
 
 ---
 
@@ -82,6 +76,13 @@ Supported API providers (Direct via Browser):
 ---
 
 ## Changelog
+
+**v1.2.0**
+- Extracted hardcoded prompt mechanics into a fully UI-editable Prompt Template format
+- Mapped system template placeholders (`{equation1}`, `{equation2}`, and `{cheatsheet}`)
+- Replicated save/load local storage functionalities for user-created prompts
+- Deprecated 'Use Cheatsheet' feature toggle
+- Deployed `official1` baseline prompt automatically to client storage
 
 **v1.1.4**
 - Added UI to save and load named Cheatsheets locally

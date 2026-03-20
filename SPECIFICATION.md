@@ -1,7 +1,7 @@
 # Technical Specification
 
 **Equational Theories Playground**  
-Version 1.1.4
+Version 1.2.0
 
 ---
 
@@ -40,12 +40,12 @@ Each line must represent a single JSON object.
 
 ## 3. Prompt Specification
 
-Below is the standard prompt configuration used to interact with LLMs.
+Below is the standard, official prompt (`official1`) used to interact with LLMs by default.
 
 ```
-You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 ({{ equation1 }}) implies Equation 2 ({{ equation2 }}) over all magmas.
+You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 ({equation1}) implies Equation 2 ({equation2}) over all magmas.
 
-[ CHEATSHEET TEXT PLACED HERE IF PROVIDED AND ENABLED ]
+{cheatsheet}
 
 Output format (use exact headers without any additional text or formatting):
 VERDICT: must be exactly TRUE or FALSE (in the same line).
@@ -54,7 +54,8 @@ PROOF: required if VERDICT is TRUE, empty otherwise.
 COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.
 ```
 
-**Fallback:** If no exactly matching `VERDICT: TRUE` or `VERDICT: FALSE` string is detected in the response string, the response score evaluates to incomplete ("NO ANSWER"). 
+**Template Variables:** You may actively customize the entire prompt template in the Playground's UI and save/load custom presets. The engine maps `{equation1}`, `{equation2}`, and `{cheatsheet}` variables directly into the template anywhere they are placed.
+**Fallback:** If no exactly matching `VERDICT: TRUE` or `VERDICT: FALSE` string is detected in the response string, the response score evaluates to incomplete ("NO_ANSWER"). 
 
 ---
 
@@ -125,6 +126,12 @@ Construct a finite magma (usually small, 2-to-3 element domains) satisfying `E1`
 ---
 
 ## Changelog
+
+**v1.2.0**
+- Extracted hardcoded prompt mechanics into a UI-editable Prompt Template feature (`{equation1}`, `{equation2}`, and `{cheatsheet}` mapping variables) 
+- Added robust prompt local storage persistence across sessions matching Cheatsheet format
+- Fully deprecated the 'Use Cheatsheet' feature toggle
+- Established `official1` baseline prompt logic
 
 **v1.1.4**
 - Added UI to save and load named Cheatsheets locally

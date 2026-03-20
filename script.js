@@ -43,6 +43,16 @@ const SCORE_THRESHOLDS = [
 /** Matches VERDICT: TRUE or VERDICT: FALSE (case-insensitive, last match wins) */
 const ANSWER_REGEX = /VERDICT:\s*(TRUE|FALSE)/gi;
 
+const DEFAULT_PROMPT = `You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 ({equation1}) implies Equation 2 ({equation2}) over all magmas.
+
+{cheatsheet}
+
+Output format (use exact headers without any additional text or formatting):
+VERDICT: must be exactly TRUE or FALSE (in the same line).
+REASONING: must be non-empty.
+PROOF: required if VERDICT is TRUE, empty otherwise.
+COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.`;
+
 /* ═══════════════════════════════════════════════════════════════════════════
    2. APPLICATION STATE
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -164,7 +174,6 @@ function cacheDom() {
   const ids = [
     'provider-select', 'model-select', 'api-key-input', 'toggle-key-btn',
     'cheatsheet-textarea', 'byte-count', 'byte-progress-fill', 'byte-warning',
-    'use-cheatsheet-toggle',
     'parallelism-slider', 'parallelism-value',
     'max-tokens-input',
     'import-csv-btn', 'csv-file-input', 'clear-problems-btn', 'add-custom-btn',
@@ -192,6 +201,10 @@ function cacheDom() {
     'cheatsheet-name-input', 'save-cheatsheet-btn', 'cheatsheet-modal-textarea',
     // Custom Problem
     'custom-modal-overlay', 'custom-modal-close', 'custom-eq1', 'custom-eq2', 'custom-truth', 'save-custom-btn',
+    // Prompts
+    'prompt-template-textarea', 'open-prompt-btn', 'prompt-template-modal-overlay', 'prompt-template-modal-close',
+    'saved-prompts-select', 'load-prompt-btn', 'delete-prompt-btn', 'prompt-name-input', 'save-prompt-btn',
+    'prompt-template-modal-textarea',
     // Modals
     'prompt-modal-overlay', 'prompt-modal-close', 'prompt-modal-content',
     'log-modal-overlay', 'log-modal-close', 'log-modal-title', 'log-modal-meta', 'log-modal-content',
@@ -220,6 +233,14 @@ function wireUi() {
     DOM.cheatsheetTextarea.value = DOM.cheatsheetModalTextarea.value;
     updateByteCounter();
   });
+
+  DOM.promptTemplateTextarea.addEventListener('input', () => {
+    DOM.promptTemplateModalTextarea.value = DOM.promptTemplateTextarea.value;
+  });
+  DOM.promptTemplateModalTextarea.addEventListener('input', () => {
+    DOM.promptTemplateTextarea.value = DOM.promptTemplateModalTextarea.value;
+  });
+
   DOM.parallelismSlider.addEventListener('input', () => {
     DOM.parallelismValue.textContent = DOM.parallelismSlider.value;
   });
@@ -277,16 +298,19 @@ function wireUi() {
   DOM.promptModalClose.addEventListener('click', () => closeModal('promptModalOverlay'));
   DOM.logModalClose.addEventListener('click', () => closeModal('logModalOverlay'));
   DOM.cheatsheetModalClose.addEventListener('click', () => closeModal('cheatsheetModalOverlay'));
+  DOM.promptTemplateModalClose.addEventListener('click', () => closeModal('promptTemplateModalOverlay'));
   DOM.customModalClose.addEventListener('click', () => closeModal('customModalOverlay'));
   DOM.promptModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.promptModalOverlay) closeModal('promptModalOverlay'); });
   DOM.logModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.logModalOverlay) closeModal('logModalOverlay'); });
   DOM.cheatsheetModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.cheatsheetModalOverlay) closeModal('cheatsheetModalOverlay'); });
+  DOM.promptTemplateModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.promptTemplateModalOverlay) closeModal('promptTemplateModalOverlay'); });
   DOM.customModalOverlay.addEventListener('click', (e) => { if (e.target === DOM.customModalOverlay) closeModal('customModalOverlay'); });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeModal('promptModalOverlay');
       closeModal('logModalOverlay');
       closeModal('cheatsheetModalOverlay');
+      closeModal('promptTemplateModalOverlay');
       closeModal('customModalOverlay');
     }
   });
@@ -294,6 +318,11 @@ function wireUi() {
   DOM.openCheatsheetBtn.addEventListener('click', () => {
     openModal('cheatsheetModalOverlay');
     DOM.cheatsheetModalTextarea.focus();
+  });
+
+  DOM.openPromptBtn.addEventListener('click', () => {
+    openModal('promptTemplateModalOverlay');
+    DOM.promptTemplateModalTextarea.focus();
   });
 
   DOM.addCustomBtn.addEventListener('click', () => {
@@ -332,6 +361,9 @@ function wireUi() {
 
   // Saved Cheatsheets
   wireCheatsheets();
+
+  // Saved Prompts
+  wirePrompts();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -345,6 +377,7 @@ function init() {
   populateModelSelect(DOM.providerSelect.value);
   initApiKeys();
   initCheatsheets();
+  initPrompts();
   loadStoredData();
   updateByteCounter();
 }
@@ -645,13 +678,15 @@ function updateSelectionUI() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
- * Matches the reference Jinja2 template from SPECIFICATION.md section 3.
- * Injects cheatsheet inline (if enabled), then shows the output format.
+ * Merges the user-provided equations and cheatsheet directly into the Prompt string template
  */
-function buildPrompt(problem, cheatsheetText, useCheatsheet) {
+function buildPrompt(problem, cheatsheetText) {
+  let pText = DOM.promptTemplateTextarea.value.trim();
+  if (!pText) pText = DEFAULT_PROMPT;
+
   // Truncate cheatsheet to MAX_CHEATSHEET_BYTES
   let cheatsheet = '';
-  if (useCheatsheet && cheatsheetText.trim().length > 0) {
+  if (cheatsheetText.trim().length > 0) {
     const enc = new TextEncoder();
     const bytes = enc.encode(cheatsheetText);
     cheatsheet = bytes.length > MAX_CHEATSHEET_BYTES
@@ -659,19 +694,10 @@ function buildPrompt(problem, cheatsheetText, useCheatsheet) {
       : cheatsheetText;
   }
 
-  let prompt = `You are a mathematician specializing in equational theories of magmas. Your task is to determine whether Equation 1 (${problem.eq1}) implies Equation 2 (${problem.eq2}) over all magmas.\n`;
-
-  if (cheatsheet) {
-    prompt += cheatsheet + '\n';
-  }
-
-  prompt += `Output format (use exact headers without any additional text or formatting):
-VERDICT: must be exactly TRUE or FALSE (in the same line).
-REASONING: must be non-empty.
-PROOF: required if VERDICT is TRUE, empty otherwise.
-COUNTEREXAMPLE: required if VERDICT is FALSE, empty otherwise.`;
-
-  return prompt;
+  return pText
+    .replace('{equation1}', problem.eq1)
+    .replace('{equation2}', problem.eq2)
+    .replace('{cheatsheet}', cheatsheet);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -780,7 +806,6 @@ async function startEvaluation() {
   const maxTokens = parseInt(DOM.maxTokensInput.value, 10) || 1024;
   const providerId = DOM.providerSelect.value;
   const modelId = DOM.modelSelect.value;
-  const useCheatsheet = DOM.useCheatsheetToggle.checked;
   const cheatsheet = DOM.cheatsheetTextarea.value;
 
   // Build results array
@@ -797,7 +822,7 @@ async function startEvaluation() {
       status: 'pending',
       rawResponse: '',
       errorMsg: '',
-      prompt: buildPrompt(p, cheatsheet, useCheatsheet),
+      prompt: buildPrompt(p, cheatsheet),
       elapsed: null,
       tokens: null,
       cost: null,
@@ -1066,8 +1091,7 @@ function showPromptModal(i) {
   if (!r) return;
   DOM.promptModalContent.textContent = r.prompt || buildPrompt(
     { eq1: r.eq1, eq2: r.eq2 },
-    DOM.cheatsheetTextarea.value,
-    DOM.useCheatsheetToggle.checked
+    DOM.cheatsheetTextarea.value
   );
   openModal('promptModalOverlay');
 }
@@ -1314,6 +1338,105 @@ function renderSavedCheatsheets() {
     select.disabled = false;
     DOM.loadCheatsheetBtn.disabled = false;
     DOM.deleteCheatsheetBtn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   24. PROMPTS MANAGER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+state.savedPrompts = {};
+
+function initPrompts() {
+  try {
+    const saved = localStorage.getItem('eq-saved-prompts');
+    if (saved) state.savedPrompts = JSON.parse(saved);
+  } catch (_) {
+    state.savedPrompts = {};
+  }
+  
+  if (!state.savedPrompts['official1']) {
+    state.savedPrompts['official1'] = DEFAULT_PROMPT;
+    try { localStorage.setItem('eq-saved-prompts', JSON.stringify(state.savedPrompts)); } catch (e) {}
+  }
+  
+  const current = localStorage.getItem('eq-current-prompt') || DEFAULT_PROMPT;
+  DOM.promptTemplateTextarea.value = current;
+  DOM.promptTemplateModalTextarea.value = current;
+
+  renderSavedPrompts();
+}
+
+function wirePrompts() {
+  DOM.promptTemplateTextarea.addEventListener('input', () => {
+    try { localStorage.setItem('eq-current-prompt', DOM.promptTemplateTextarea.value); } catch(e) {}
+  });
+
+  DOM.savePromptBtn.addEventListener('click', () => {
+    const name = DOM.promptNameInput.value.trim();
+    const content = DOM.promptTemplateTextarea.value;
+    if (!name) {
+      alert("Please provide a name to save the prompt.");
+      return;
+    }
+    state.savedPrompts[name] = content;
+    try {
+      localStorage.setItem('eq-saved-prompts', JSON.stringify(state.savedPrompts));
+    } catch (_) { }
+    renderSavedPrompts();
+    DOM.savedPromptsSelect.value = name;
+  });
+
+  DOM.loadPromptBtn.addEventListener('click', () => {
+    const name = DOM.savedPromptsSelect.value;
+    if (name && state.savedPrompts[name] !== undefined) {
+      DOM.promptTemplateTextarea.value = state.savedPrompts[name];
+      DOM.promptTemplateModalTextarea.value = state.savedPrompts[name];
+      DOM.promptNameInput.value = name;
+      try { localStorage.setItem('eq-current-prompt', state.savedPrompts[name]); } catch(e) {}
+    }
+  });
+
+  DOM.deletePromptBtn.addEventListener('click', () => {
+    const name = DOM.savedPromptsSelect.value;
+    if (!name) return;
+    if (name === 'official1') {
+      alert("Cannot delete the official1 default prompt.");
+      return;
+    }
+    if (confirm(`Delete saved prompt "${name}"?`)) {
+      delete state.savedPrompts[name];
+      try {
+        localStorage.setItem('eq-saved-prompts', JSON.stringify(state.savedPrompts));
+      } catch (_) { }
+      renderSavedPrompts();
+      DOM.promptNameInput.value = '';
+    }
+  });
+}
+
+function renderSavedPrompts() {
+  const select = DOM.savedPromptsSelect;
+  select.innerHTML = '';
+  const names = Object.keys(state.savedPrompts).sort();
+  if (names.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '-- No saved prompts --';
+    select.appendChild(opt);
+    select.disabled = true;
+    DOM.loadPromptBtn.disabled = true;
+    DOM.deletePromptBtn.disabled = true;
+  } else {
+    names.forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      select.appendChild(opt);
+    });
+    select.disabled = false;
+    DOM.loadPromptBtn.disabled = false;
+    DOM.deletePromptBtn.disabled = false;
   }
 }
 
