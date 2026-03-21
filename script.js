@@ -82,8 +82,9 @@ const state = {
   activeTab: 'run',
   history: [],
   historyViewingRun: null,
-
-  autoRetryTimer: null,
+  historyShowFavoritesOnly: false,
+  historyCompareMode: false,
+  historyCompareSelected: [],
   autoRetryTimeLeft: 0,
 };
 
@@ -190,7 +191,7 @@ function cacheDom() {
     'import-csv-btn', 'csv-file-input', 'clear-problems-btn', 'add-custom-btn',
     'problems-status',
     'problem-search', 'filter-pills', 'truth-filter-pills',
-    'problem-list',
+    'problem-list', 'bulk-select-input', 'bulk-select-btn',
     'selected-panel', 'selected-count', 'selected-preview',
     'clear-sel-btn', 'select-all-btn',
     'run-btn', 'stop-btn', 'run-count',
@@ -202,10 +203,10 @@ function cacheDom() {
     'score-banner', 'score-interpretation',
     'results-area', 'results-empty', 'results-cards',
     'export-csv-btn',
-    // Layout roots (for tab switching)
     'tab-run', 'tab-history', 'sidebar-run-view', 'sidebar-history-view',
-    'history-list', 'clear-history-btn',
-    'sidebar', 'main-area', 'auto-retry-checkbox', 'retry-countdown',
+    'history-list', 'clear-history-btn', 'favorite-filter-btn', 'compare-mode-btn',
+    'sidebar', 'main-area', 'auto-retry-checkbox', 'run-three-times-checkbox', 'retry-countdown',
+    'history-filters', 'hist-diff-filter', 'hist-correct-filter',
     // Saved API keys
     'saved-keys-select', 'load-key-btn', 'delete-key-btn', 'key-name-input', 'save-key-btn',
     // Cheatsheet
@@ -233,7 +234,13 @@ function cacheDom() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function wireUi() {
-  DOM.providerSelect.addEventListener('change', () => populateModelSelect(DOM.providerSelect.value));
+  DOM.providerSelect.addEventListener('change', () => {
+    populateModelSelect(DOM.providerSelect.value);
+    try { localStorage.setItem('eq-last-provider', DOM.providerSelect.value); } catch(e) {}
+  });
+  DOM.modelSelect.addEventListener('change', () => {
+    try { localStorage.setItem('eq-last-model', DOM.modelSelect.value); } catch(e) {}
+  });
   DOM.toggleKeyBtn.addEventListener('click', () => {
     const inp = DOM.apiKeyInput;
     inp.type = inp.type === 'password' ? 'text' : 'password';
@@ -289,6 +296,29 @@ function wireUi() {
   });
 
   // Selection controls
+  DOM.bulkSelectBtn.addEventListener('click', () => {
+    const input = DOM.bulkSelectInput.value.trim();
+    if (!input) return;
+    const parts = input.split(',');
+    for (const part of parts) {
+      const range = part.split('-');
+      if (range.length === 1) {
+        const idx = parseInt(range[0].trim(), 10) - 1;
+        if (!isNaN(idx) && state.problems[idx]) state.selectedIndices.add(idx);
+      } else if (range.length === 2) {
+        const start = parseInt(range[0].trim(), 10) - 1;
+        const end = parseInt(range[1].trim(), 10) - 1;
+        if (!isNaN(start) && !isNaN(end)) {
+          for (let i = Math.max(0, start); i <= Math.min(state.problems.length - 1, end); i++) {
+            state.selectedIndices.add(i);
+          }
+        }
+      }
+    }
+    DOM.bulkSelectInput.value = '';
+    renderProblemList();
+    updateSelectionUI();
+  });
   DOM.clearSelBtn.addEventListener('click', () => {
     state.selectedIndices.clear();
     renderProblemList();
@@ -384,6 +414,15 @@ function wireUi() {
 
   // History
   wireHistory();
+  
+  DOM.histDiffFilter.addEventListener('change', applyHistoryFilters);
+  DOM.histCorrectFilter.addEventListener('change', applyHistoryFilters);
+  
+  DOM.favoriteFilterBtn.addEventListener('click', () => {
+    state.historyShowFavoritesOnly = !state.historyShowFavoritesOnly;
+    DOM.favoriteFilterBtn.classList.toggle('active', state.historyShowFavoritesOnly);
+    renderHistoryList();
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -394,7 +433,23 @@ function init() {
   cacheDom();
   wireUi();
   populateProviderSelect();
+
+  try {
+    const lastProvider = localStorage.getItem('eq-last-provider');
+    if (lastProvider && PROVIDER_CATALOGUE[lastProvider]) {
+      DOM.providerSelect.value = lastProvider;
+    }
+  } catch(e) {}
+
   populateModelSelect(DOM.providerSelect.value);
+
+  try {
+    const lastModel = localStorage.getItem('eq-last-model');
+    if (lastModel && PROVIDER_CATALOGUE[DOM.providerSelect.value].models.some(m => m.id === lastModel)) {
+      DOM.modelSelect.value = lastModel;
+    }
+  } catch(e) {}
+
   initApiKeys();
   initCheatsheets();
   initPrompts();
@@ -838,25 +893,37 @@ async function startEvaluation(isRetry = false) {
   const cheatsheet = DOM.cheatsheetTextarea.value;
 
   if (!isRetry) {
-    // Build initial results array
-    state.results = selectedSorted.map(idx => {
+    const runThreeTimes = DOM.runThreeTimesCheckbox.checked;
+    state.results = [];
+    selectedSorted.forEach(idx => {
       const p = state.problems[idx];
-      return {
+      const attemptsCount = runThreeTimes ? 3 : 1;
+      const attempts = [];
+      for (let attempt = 1; attempt <= attemptsCount; attempt++) {
+        attempts.push({
+          attemptNum: attempt,
+          prediction: '',
+          correct: null,
+          status: 'pending',
+          rawResponse: '',
+          errorMsg: '',
+          elapsed: null,
+          tokens: null,
+          cost: null,
+        });
+      }
+      state.results.push({
         problemIdx: idx,
         eq1: p.eq1,
         eq2: p.eq2,
         difficulty: p.difficulty,
         groundTruth: p.groundTruth,
+        status: 'pending',
         prediction: '',
         correct: null,
-        status: 'pending',
-        rawResponse: '',
-        errorMsg: '',
         prompt: buildPrompt(p, cheatsheet),
-        elapsed: null,
-        tokens: null,
-        cost: null,
-      };
+        attempts: attempts
+      });
     });
     DOM.resultsEmpty.classList.add('hidden');
     DOM.resultsCards.innerHTML = '';
@@ -864,12 +931,19 @@ async function startEvaluation(isRetry = false) {
   } else {
     // Reset any errored results back to pending state for a retry
     state.results.forEach((r, i) => {
-      if (r.status === 'error') {
-        r.status = 'pending';
-        r.errorMsg = '';
-        r.rawResponse = '';
-        r.correct = null;
-        updateCard(i);
+      let anyError = false;
+      r.attempts.forEach(att => {
+        if (att.status === 'error') {
+          att.status = 'pending';
+          att.errorMsg = '';
+          att.rawResponse = '';
+          att.correct = null;
+          anyError = true;
+        }
+      });
+      if (anyError) {
+         r.status = 'pending';
+         updateCard(i);
       }
     });
   }
@@ -943,48 +1017,73 @@ async function runBatch(results, providerId, modelId, apiKey, maxTokens, paralle
   const pool = new Set();
   let nextIndex = 0;
 
-  const runOne = async (i) => {
-    const result = results[i];
-    if (result.status !== 'pending') return;
+  const activeTasks = [];
+  results.forEach((r, rIdx) => {
+    r.attempts.forEach((att, aIdx) => {
+      if (att.status === 'pending') {
+         activeTasks.push({ rIdx, aIdx });
+      }
+    });
+  });
 
+  const runOne = async (tIdx) => {
+    const { rIdx, aIdx } = activeTasks[tIdx];
+    const result = results[rIdx];
+    const att = result.attempts[aIdx];
+
+    att.status = 'running';
     result.status = 'running';
-    updateCard(i);
+    updateCard(rIdx);
 
     try {
       const { text, elapsed, tokens, cost } = await callApi(
         providerId, modelId, apiKey, result.prompt, maxTokens, signal
       );
-      result.rawResponse = text;
-      result.prediction = extractAnswer(text);
-      result.elapsed = elapsed;
-      result.tokens = tokens;
-      result.cost = cost;
-      result.correct = result.groundTruth
-        ? result.prediction === result.groundTruth
-        : null;
-      result.status = 'done';
+      att.rawResponse = text;
+      att.prediction = extractAnswer(text);
+      att.elapsed = elapsed;
+      att.tokens = tokens;
+      att.cost = cost;
+      att.correct = result.groundTruth ? att.prediction === result.groundTruth : null;
+      att.status = 'done';
     } catch (err) {
       if (err.name === 'AbortError') {
-        result.status = 'skipped';
-        result.errorMsg = 'Cancelled';
+        att.status = 'skipped';
+        att.errorMsg = 'Cancelled';
       } else {
-        result.status = 'error';
-        result.errorMsg = err.message || String(err);
-        console.error(`Problem #${result.problemIdx + 1} failed:`, err);
+        att.status = 'error';
+        att.errorMsg = err.message || String(err);
+        console.error(`Problem #${result.problemIdx + 1} attempt ${att.attemptNum} failed:`, err);
       }
     }
 
-    updateCard(i);
+    const allDone = result.attempts.every(a => a.status === 'done' || a.status === 'skipped');
+    const hasError = result.attempts.some(a => a.status === 'error');
+    if (hasError) result.status = 'error';
+    else if (allDone) result.status = 'done';
+    
+    if (result.status === 'done') {
+       const trues = result.attempts.filter(a => a.prediction === 'TRUE').length;
+       const falses = result.attempts.filter(a => a.prediction === 'FALSE').length;
+       result.prediction = trues > falses ? 'TRUE' : (falses > trues ? 'FALSE' : result.attempts[0].prediction);
+       result.correct = result.groundTruth ? result.prediction === result.groundTruth : null;
+    }
+
+    updateCard(rIdx);
     updateStats();
-    updateProgress(
-      results.filter(r => r.status !== 'pending' && r.status !== 'running').length,
-      results.length
-    );
+
+    let totalAtt = 0;
+    let doneAtt = 0;
+    results.forEach(r => r.attempts.forEach(a => {
+      totalAtt++;
+      if (a.status === 'done' || a.status === 'skipped' || a.status === 'error') doneAtt++;
+    }));
+    updateProgress(doneAtt, totalAtt);
   };
 
-  while (nextIndex < results.length || pool.size > 0) {
+  while (nextIndex < activeTasks.length || pool.size > 0) {
     if (signal.aborted && pool.size === 0) break;
-    while (!signal.aborted && nextIndex < results.length && pool.size < parallelism) {
+    while (!signal.aborted && nextIndex < activeTasks.length && pool.size < parallelism) {
       const i = nextIndex++;
       const job = runOne(i).finally(() => pool.delete(job));
       pool.add(job);
@@ -1034,10 +1133,9 @@ function updateCard(i) {
   if (r.status === 'done' && r.correct === false) cardClass += ' correct-false';
 
   // Metrics
-  const timeStr = r.elapsed != null ? `${(r.elapsed / 1000).toFixed(1)}s` : '—';
-  const tokStr = r.tokens != null ? String(r.tokens) : '—';
-  const costStr = r.cost != null ? `$${r.cost.toFixed(4)}` : '$0.0000';
-  const predClass = r.prediction === 'TRUE' ? 'green' : r.prediction === 'FALSE' ? 'red' : 'muted';
+  const timeStr = r.attempts.map(a => a.elapsed != null ? `${(a.elapsed/1000).toFixed(1)}s` : '—').join(' | ');
+  const tokStr = r.attempts.map(a => a.tokens != null ? String(a.tokens) : '—').join(' | ');
+  const predStr = r.attempts.map(a => `<span class="${a.prediction === 'TRUE' ? 'pred-true' : a.prediction === 'FALSE' ? 'pred-false' : 'pred-na'}">${a.prediction || '—'}</span>`).join('<span style="color:var(--text-3); margin:0 4px;">|</span>');
 
   // Action buttons enabled only when done
   const done = r.status === 'done' || r.status === 'error';
@@ -1046,7 +1144,7 @@ function updateCard(i) {
   div.innerHTML = `
     <div class="card-header">
       <span class="card-model-name">${escHtml(`${providerId}/${modelId}`)}</span>
-      <span class="card-problem-id">problem #${r.problemIdx + 1}</span>
+      <span class="card-problem-id">problem #${r.problemIdx + 1}${r.attempts.length > 1 ? ' (3x)' : ''}</span>
       <span class="card-verdict-badge ${verdictBadgeClass}">${verdictBadgeText}</span>
     </div>
     <div class="card-equations">
@@ -1056,16 +1154,12 @@ function updateCard(i) {
     </div>
     <div class="card-metrics">
       <div class="card-metric">
-        <span class="card-metric-val ${predClass}">${r.prediction || '—'}</span>
+        <span class="card-metric-val" style="display:flex; align-items:center;">${predStr}</span>
         <span class="card-metric-label">Output</span>
       </div>
       <div class="card-metric">
         <span class="card-metric-val">${r.groundTruth ? `<span class="${r.groundTruth === 'TRUE' ? 'pred-true' : 'pred-false'}">${r.groundTruth}</span>` : '—'}</span>
         <span class="card-metric-label">Expected</span>
-      </div>
-      <div class="card-metric">
-        <span class="card-metric-val">${costStr}</span>
-        <span class="card-metric-label">Cost</span>
       </div>
       <div class="card-metric">
         <span class="card-metric-val">${tokStr}</span>
@@ -1083,7 +1177,7 @@ function updateCard(i) {
       <button class="card-action-btn" onclick="showLogModal(${i})" ${done ? '' : 'disabled'}>Full log</button>
     </div>
     <div class="card-detail" id="card-detail-${i}">
-      <pre>${r.rawResponse ? escHtml(r.rawResponse) : (r.errorMsg ? escHtml(r.errorMsg) : '…')}</pre>
+      <pre>${r.attempts.map(a => (r.attempts.length > 1 ? `=== ATTEMPT ${a.attemptNum} ===\n` : '') + (a.rawResponse ? escHtml(a.rawResponse) : (a.errorMsg ? escHtml(a.errorMsg) : '…'))).join('\n\n')}</pre>
     </div>
   `;
 }
@@ -1181,12 +1275,18 @@ function showLogModal(i) {
   DOM.logModalMeta.innerHTML = `
     <div><strong>Eq1:</strong> ${escHtml(r.eq1)}</div>
     <div><strong>Eq2:</strong> ${escHtml(r.eq2)}</div>
-    <div><strong>Prediction:</strong> <span class="${r.prediction === 'TRUE' ? 'pred-true' : r.prediction === 'FALSE' ? 'pred-false' : 'pred-na'}">${r.prediction || 'NO_ANSWER'}</span></div>
+    <div><strong>Overall Prediction:</strong> <span class="${r.prediction === 'TRUE' ? 'pred-true' : r.prediction === 'FALSE' ? 'pred-false' : 'pred-na'}">${r.prediction || 'NO_ANSWER'}</span></div>
     ${r.groundTruth ? `<div><strong>Expected:</strong> <span class="${r.groundTruth === 'TRUE' ? 'pred-true' : 'pred-false'}">${r.groundTruth}</span></div>` : ''}
     ${r.correct !== null ? `<div><strong>Correct:</strong> ${r.correct ? '✓ Yes' : '✗ No'}</div>` : ''}
-    ${r.errorMsg ? `<div><strong>Error:</strong> <span style="color:var(--red)">${escHtml(r.errorMsg)}</span></div>` : ''}
   `;
-  DOM.logModalContent.textContent = r.rawResponse || '(no response)';
+  
+  let content = '';
+  r.attempts.forEach(att => {
+     if (r.attempts.length > 1) content += `=== ATTEMPT ${att.attemptNum} ===\n`;
+     content += (att.rawResponse || (att.errorMsg ? 'Error: ' + att.errorMsg : '(no response)')) + '\n\n';
+  });
+  
+  DOM.logModalContent.textContent = content.trim();
   openModal('logModalOverlay');
 }
 
@@ -1208,35 +1308,58 @@ function exportResultsCsv() {
   if (!activeRes.length) return;
 
   const COLUMNS = [
-    'problem_num', 'eq1', 'eq2', 'difficulty',
-    'ground_truth', 'prediction', 'correct', 'status',
-    'tokens', 'cost', 'elapsed_ms', 'raw_response',
+    'problem_num', 'eq1', 'eq2', 'attempt', 'difficulty',
+    'true_answer', 'verdict', 'reasoning', 'proof', 'counterexample',
+    'status', 'tokens', 'cost', 'elapsed_ms', 'raw_response',
   ];
 
-  const rows = activeRes.map(r => [
-    r.problemIdx + 1,
-    r.eq1, r.eq2, r.difficulty,
-    r.groundTruth, r.prediction,
-    r.correct === null ? '' : r.correct ? 'TRUE' : 'FALSE',
-    r.status,
-    r.tokens ?? '',
-    r.cost != null ? r.cost.toFixed(6) : '',
-    r.elapsed ?? '',
-    r.rawResponse.replace(/"/g, '""'),
-  ]);
+  function extractSection(text, header) {
+    if (!text) return '';
+    const hdrs = 'VERDICT|REASONING|PROOF|COUNTEREXAMPLE';
+    const regex = new RegExp(`(?:^|\\n)[#\\s\\*]*${header}[\\*\\s]*:[\\s\\*]*([\\s\\S]*?)(?=(?:\\r?\\n)[#\\s\\*]*(?:${hdrs})[\\*\\s]*:|$)`, 'i');
+    const match = text.match(regex);
+    return match ? match[1].trim() : '';
+  }
+
+  const rows = [];
+  activeRes.forEach(r => {
+    r.attempts.forEach((att) => {
+      const reasoning = extractSection(att.rawResponse, 'REASONING');
+      const proof = extractSection(att.rawResponse, 'PROOF');
+      const counterexample = extractSection(att.rawResponse, 'COUNTEREXAMPLE');
+      
+      rows.push([
+        r.problemIdx + 1,
+        r.eq1, r.eq2, att.attemptNum || 1, r.difficulty,
+        r.groundTruth, att.prediction, reasoning, proof, counterexample,
+        att.status,
+        att.tokens ?? '',
+        att.cost != null ? att.cost.toFixed(6) : '',
+        att.elapsed ?? '',
+        att.rawResponse,
+      ]);
+    });
+  });
 
   const csvContent = [COLUMNS, ...rows]
     .map(row => row.map(cell => {
       const s = String(cell ?? '');
-      return (s.includes(',') || s.includes('\n') || s.includes('"')) ? `"${s}"` : s;
+      return (s.includes(',') || s.includes('\n') || s.includes('"')) ? `"${s.replace(/"/g, '""')}"` : s;
     }).join(','))
     .join('\n');
+
+  const promptName = DOM.promptNameInput?.value.trim() || 'CustomPrompt';
+  let runNamePart = DOM.modelSelect.value;
+  if (state.activeTab === 'history' && state.historyViewingRun) {
+    runNamePart = state.historyViewingRun.runName || state.historyViewingRun.modelId;
+  }
+  const dateStr = new Date().toISOString().split('T')[0];
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `eqthry-results-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.csv`;
+  link.download = `${promptName}_${runNamePart.replace(/[\/\\?%*:|"<>\\]/g, '-')}_${dateStr}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1530,6 +1653,7 @@ function switchTab(tab) {
   if (tab === 'run') {
     DOM.sidebarRunView.classList.remove('hidden');
     DOM.sidebarHistoryView.classList.add('hidden');
+    DOM.historyFilters.classList.add('hidden');
     // If we're not running, restore state.results to the screen
     if (!state.running && state.results.length > 0) {
       renderActiveResults();
@@ -1544,6 +1668,7 @@ function switchTab(tab) {
     DOM.sidebarHistoryView.classList.remove('hidden');
     DOM.evalProgressWrap.classList.add('hidden');
     DOM.scoreBanner.classList.add('hidden');
+    DOM.historyFilters.classList.remove('hidden');
     
     // Clear out run view or show a prompt
     renderHistoryList();
@@ -1583,6 +1708,9 @@ function renderActiveResults() {
   }
   
   results.forEach((_, i) => createCard(i));
+  
+  applyHistoryFilters();
+  
   // Call interpretation manually
   const total = results.length;
   const correct = results.filter(r => r.correct === true).length;
@@ -1601,6 +1729,25 @@ function renderActiveResults() {
     DOM.scoreBanner.classList.remove('hidden');
   } else {
     DOM.scoreBanner.classList.add('hidden');
+  }
+}
+
+function applyHistoryFilters() {
+  if (state.activeTab !== 'history') return;
+  const diff = DOM.histDiffFilter.value;
+  const corr = DOM.histCorrectFilter.value;
+  const results = getActiveResults();
+  
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const card = document.getElementById(`card-${i}`);
+    if (!card) continue;
+    let show = true;
+    if (diff !== 'all' && r.difficulty !== diff) show = false;
+    if (corr === 'correct' && r.correct !== true) show = false;
+    if (corr === 'incorrect' && r.correct !== false) show = false;
+    if (corr === 'none' && r.correct !== null) show = false;
+    card.style.display = show ? '' : 'none';
   }
 }
 
@@ -1623,6 +1770,29 @@ function wireHistory() {
       switchTab('history'); // forces empty screen refresh
     }
   });
+
+  DOM.compareModeBtn.addEventListener('click', () => {
+    state.historyCompareMode = !state.historyCompareMode;
+    DOM.compareModeBtn.classList.toggle('active', state.historyCompareMode);
+    if (!state.historyCompareMode) {
+      state.historyCompareSelected = [];
+      if (state.historyViewingRun) {
+        renderActiveResults();
+      } else {
+        DOM.resultsEmpty.classList.remove('hidden');
+        DOM.resultsEmpty.innerHTML = `<div class="results-empty-icon">🕒</div><p>Select a local run from the left sidebar to view past metrics and raw outputs.</p>`;
+        DOM.resultsCards.innerHTML = '';
+        DOM.scoreBanner.classList.add('hidden');
+      }
+    } else {
+      DOM.resultsCards.innerHTML = '';
+      DOM.scoreBanner.classList.add('hidden');
+      DOM.resultsEmpty.classList.remove('hidden');
+      DOM.resultsEmpty.innerHTML = `<div class="results-empty-icon">⚖️</div><p>Select two runs from the sidebar to compare them (0/2).</p>`;
+      state.historyViewingRun = null;
+    }
+    renderHistoryList();
+  });
 }
 
 function saveRunToHistory() {
@@ -1634,23 +1804,45 @@ function saveRunToHistory() {
   
   const providerId = DOM.providerSelect.value;
   const modelId = DOM.modelSelect.value;
-  const cheatsheetName = DOM.savedCheatsheetsSelect.value || (DOM.cheatsheetTextarea.value.trim() ? "Custom / Unsaved" : "None");
+  let cheatsheetName = DOM.savedCheatsheetsSelect.value || (DOM.cheatsheetTextarea.value.trim() ? "Custom" : "None");
+  // Clean ' / ' if anything existed in earlier formats, just keep simple alphanumeric prefixes where possible, but it shouldn't matter.
   
+  let nextNum = 1;
+  const prefix = cheatsheetName + '_';
+  state.history.forEach(r => {
+    if (r.runName && r.runName.startsWith(prefix)) {
+      const num = parseInt(r.runName.substring(prefix.length), 10);
+      if (!isNaN(num) && num >= nextNum) {
+        nextNum = num + 1;
+      }
+    }
+  });
+  const defaultRunName = `${cheatsheetName}_${nextNum}`;
+
   const runObj = {
     id: 'run_' + Date.now(),
     timestamp: Date.now(),
     modelId: modelId,
+    runName: defaultRunName,
     cheatsheetName: cheatsheetName,
     accuracy: accuracy,
     scorable: scorable,
     total: total,
-    results: JSON.parse(JSON.stringify(state.results))
+    results: JSON.parse(JSON.stringify(state.results)),
+    favorite: false
   };
   
   state.history.unshift(runObj);
-  // Keep last 50 runs to save storage limits
-  if (state.history.length > 50) {
-    state.history.pop();
+  
+  let nonFavCount = state.history.filter(r => !r.favorite).length;
+  while (nonFavCount > 50) {
+    for (let i = state.history.length - 1; i >= 0; i--) {
+      if (!state.history[i].favorite) {
+        state.history.splice(i, 1);
+        nonFavCount--;
+        break;
+      }
+    }
   }
   
   try {
@@ -1664,15 +1856,23 @@ function renderHistoryList() {
   const list = DOM.historyList;
   list.innerHTML = '';
   
-  if (state.history.length === 0) {
+  const runsToShow = state.historyShowFavoritesOnly 
+    ? state.history.filter(run => run.favorite) 
+    : state.history;
+
+  if (runsToShow.length === 0) {
     list.innerHTML = `<div class="history-empty" style="color:var(--text-3); font-size:0.8rem; text-align:center; padding:20px 0;">No history yet.</div>`;
     return;
   }
   
-  state.history.forEach(run => {
+  runsToShow.forEach(run => {
     const div = document.createElement('div');
     div.className = 'history-item';
-    if (state.historyViewingRun && state.historyViewingRun.id === run.id) {
+    
+    if (!state.historyCompareMode && state.historyViewingRun && state.historyViewingRun.id === run.id) {
+      div.classList.add('active');
+    }
+    if (state.historyCompareMode && state.historyCompareSelected.includes(run.id)) {
       div.classList.add('active');
     }
     
@@ -1680,22 +1880,216 @@ function renderHistoryList() {
     const dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     const pct = run.scorable > 0 ? (run.accuracy * 100).toFixed(1) + '%' : '—';
     
+    const cbHtml = state.historyCompareMode ? `<input type="checkbox" class="compare-cb" data-id="${run.id}" ${state.historyCompareSelected.includes(run.id) ? 'checked' : ''} style="margin-right: 6px; cursor: pointer;" />` : '';
+    const nameStr = escHtml(run.runName || run.modelId);
+
     div.innerHTML = `
-      <div class="history-title">${run.modelId}</div>
-      <div style="font-size: 0.72rem; color: var(--text-3); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 ${run.cheatsheetName || 'Unknown'}</div>
+      <div style="display:flex; justify-content: space-between; align-items: flex-start;">
+        <div style="display:flex; align-items:flex-start;">
+          ${cbHtml}
+          <div class="history-title" style="margin-bottom:0; line-height: 1.2;">${nameStr}</div>
+          <button class="icon-btn edit-name-btn" style="font-size:0.9rem; margin-left:4px; margin-top:-2px; padding:0; color:var(--text-3); background:none; border:none; cursor:pointer;" title="Edit name">✎</button>
+        </div>
+        <div style="display:flex; gap: 4px;">
+          <button class="icon-btn fav-btn" style="font-size:1.1rem; padding:0; line-height:1; color:${run.favorite ? 'gold' : 'var(--text-3)'}; border:none; background:transparent; cursor:pointer;" aria-label="Favorite">★</button>
+          <button class="icon-btn del-btn" style="font-size:1.1rem; padding:0; line-height:1; color:var(--text-3); border:none; background:transparent; cursor:pointer;" aria-label="Delete">✕</button>
+        </div>
+      </div>
+      <div style="font-size: 0.72rem; color: var(--text-3); margin-top: 4px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 ${escHtml(run.cheatsheetName || 'Unknown')}</div>
       <div class="history-meta">
         <span>${dateStr}</span>
         <span style="color: ${run.accuracy >= 0.53 ? 'var(--green)' : 'var(--text-2)'}; font-weight:600;">${pct}</span>
       </div>
     `;
     
-    div.addEventListener('click', () => {
-      state.historyViewingRun = run;
-      renderHistoryList(); // to update active class
-      renderActiveResults();
+    const favBtn = div.querySelector('.fav-btn');
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      run.favorite = !run.favorite;
+      try { localStorage.setItem('eq-history', JSON.stringify(state.history)); } catch (e) {}
+      renderHistoryList();
     });
-    
+
+    const editBtn = div.querySelector('.edit-name-btn');
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const newName = prompt("Enter new run name:", run.runName || run.modelId);
+      if (newName !== null && newName.trim() !== "") {
+        run.runName = newName.trim();
+        try { localStorage.setItem('eq-history', JSON.stringify(state.history)); } catch (e) {}
+        renderHistoryList();
+        if (!state.historyCompareMode && state.historyViewingRun && state.historyViewingRun.id === run.id) renderActiveResults();
+      }
+    });
+
+    const delBtn = div.querySelector('.del-btn');
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm('Delete this history run?')) {
+        state.history = state.history.filter(r => r.id !== run.id);
+        if (state.historyViewingRun && state.historyViewingRun.id === run.id) {
+          state.historyViewingRun = null;
+          DOM.resultsEmpty.classList.remove('hidden');
+          DOM.resultsEmpty.innerHTML = `<div class="results-empty-icon">🕒</div><p>Select a local run from the left sidebar to view past metrics and raw outputs.</p>`;
+          DOM.resultsCards.innerHTML = '';
+          updateStats();
+        }
+        try { localStorage.setItem('eq-history', JSON.stringify(state.history)); } catch (e) {}
+        renderHistoryList();
+      }
+    });
+
+    if (state.historyCompareMode) {
+      const cb = div.querySelector('.compare-cb');
+      cb.addEventListener('change', (e) => {
+         if (e.target.checked) {
+            if (state.historyCompareSelected.length >= 2) {
+               e.target.checked = false;
+               alert("You can only compare 2 runs at a time.");
+               return;
+            }
+            state.historyCompareSelected.push(run.id);
+         } else {
+            state.historyCompareSelected = state.historyCompareSelected.filter(id => id !== run.id);
+         }
+         
+         if (state.historyCompareSelected.length === 2) {
+            const r1 = state.history.find(r => r.id === state.historyCompareSelected[0]);
+            const r2 = state.history.find(r => r.id === state.historyCompareSelected[1]);
+            renderCompareView(r1, r2);
+         } else {
+            DOM.resultsCards.innerHTML = '';
+            DOM.scoreBanner.classList.add('hidden');
+            DOM.resultsEmpty.classList.remove('hidden');
+            DOM.resultsEmpty.innerHTML = `<div class="results-empty-icon">⚖️</div><p>Select one more run from the sidebar to compare (${state.historyCompareSelected.length}/2).</p>`;
+         }
+         renderHistoryList();
+      });
+      
+      div.addEventListener('click', (e) => {
+         if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+         cb.click();
+      });
+    } else {
+      div.addEventListener('click', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+        state.historyViewingRun = run;
+        renderHistoryList(); 
+        renderActiveResults();
+      });
+    }
+
     list.appendChild(div);
   });
+}
+
+// ====== COMPARE RENDER ======
+
+function renderCompareView(runA, runB) {
+  DOM.resultsEmpty.classList.add('hidden');
+  DOM.resultsCards.innerHTML = '';
+  
+  const aMap = new Map();
+  runA.results.forEach(r => aMap.set(r.problemIdx, r));
+  const bMap = new Map();
+  runB.results.forEach(r => bMap.set(r.problemIdx, r));
+
+  const commonIndices = Array.from(aMap.keys()).filter(idx => bMap.has(idx)).sort((a,b)=>a-b);
+
+  if (commonIndices.length === 0) {
+    DOM.resultsEmpty.classList.remove('hidden');
+    DOM.resultsEmpty.innerHTML = `<div class="results-empty-icon">Ø</div><p>No common problems found between these two runs.</p>`;
+    return;
+  }
+
+  let bothCorrect = 0, aBetter = 0, bBetter = 0, bothWrong = 0;
+  commonIndices.forEach(idx => {
+    const resA = aMap.get(idx);
+    const resB = bMap.get(idx);
+    const aCorr = resA.correct === true;
+    const bCorr = resB.correct === true;
+    if (aCorr && bCorr) bothCorrect++;
+    else if (aCorr && !bCorr) aBetter++;
+    else if (!aCorr && bCorr) bBetter++;
+    else bothWrong++;
+  });
+
+  DOM.scoreBanner.classList.remove('hidden', 'level-excel', 'level-good', 'level-modest', 'level-random', 'level-below');
+  DOM.scoreBanner.className = 'score-banner';
+  DOM.scoreInterpretation.innerHTML = `
+    <strong>Comparison:</strong> 
+    <span style="color:var(--green)">Both Correct: ${bothCorrect}</span> <span class="dim">|</span> 
+    <span style="color:var(--cyan)">${escHtml(runA.modelId)} Better: ${aBetter}</span> <span class="dim">|</span> 
+    <span style="color:var(--cyan)">${escHtml(runB.modelId)} Better: ${bBetter}</span> <span class="dim">|</span> 
+    <span style="color:var(--red)">Both Wrong: ${bothWrong}</span>
+  `;
+
+  const frag = document.createDocumentFragment();
+  commonIndices.forEach(idx => {
+    const resA = aMap.get(idx);
+    const resB = bMap.get(idx);
+    frag.appendChild(createCompareCard(resA, resB, runA.modelId, runB.modelId));
+  });
+  DOM.resultsCards.appendChild(frag);
+
+  DOM.statTotal.textContent = commonIndices.length;
+  DOM.statDoneToday.textContent = '—';
+  DOM.statAccuracy.textContent = '—';
+  DOM.statTp.textContent = '—';
+  DOM.statTn.textContent = '—';
+  DOM.statFp.textContent = '—';
+  DOM.statFn.textContent = '—';
+}
+
+function createCompareCard(resA, resB, nameA, nameB) {
+  const div = document.createElement('div');
+  div.className = 'result-card comparison-card';
+
+  const formatAtt = (r) => {
+    if(!r.attempts) return `<span class="${r.prediction === 'TRUE' ? 'pred-true' : r.prediction === 'FALSE' ? 'pred-false' : 'pred-na'}">${r.prediction || '—'}</span>`;
+    return r.attempts.map(a => `<span class="${a.prediction === 'TRUE' ? 'pred-true' : a.prediction === 'FALSE' ? 'pred-false' : 'pred-na'}">${a.prediction || '—'}</span>`).join('<span style="color:var(--text-3); margin:0 4px;">|</span>');
+  };
+  const formatTime = (r) => {
+    if(!r.attempts) return r.elapsed != null ? `${(r.elapsed/1000).toFixed(1)}s` : '—';
+    return r.attempts.map(a => a.elapsed != null ? `${(a.elapsed/1000).toFixed(1)}s` : '—').join(' | ');
+  };
+
+  const getVerdictBadge = (r) => {
+    if (r.correct === true) return '<span class="card-verdict-badge correct">CORRECT</span>';
+    if (r.correct === false) return '<span class="card-verdict-badge incorrect">INCORRECT</span>';
+    return `<span class="card-verdict-badge no-truth">${r.prediction || 'NO ANSWER'}</span>`;
+  };
+
+  div.innerHTML = `
+    <div class="card-header" style="flex-wrap: wrap;">
+      <span class="card-problem-id" style="min-width: 100%;">Problem #${resA.problemIdx + 1}</span>
+    </div>
+    <div class="card-equations">
+      <span class="card-eq" title="${escHtml(resA.eq1)}">${escHtml(resA.eq1)}</span>
+      <span class="card-eq-arrow">→</span>
+      <span class="card-eq" title="${escHtml(resA.eq2)}">${escHtml(resA.eq2)}</span>
+      <span class="card-difficulty ${resA.difficulty}" style="margin-left:auto">${resA.difficulty}</span>
+    </div>
+    
+    <div style="display:flex; gap: 10px; margin-top: 10px;">
+      <div style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 8px;">
+        <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2); display:flex; justify-content:space-between;">
+           <span>A: ${escHtml(nameA)}</span>
+           ${getVerdictBadge(resA)}
+        </div>
+        <div style="font-size: 0.8rem; margin-bottom: 2px;"><strong>Output:</strong> <span style="display:inline-flex; align-items:center;">${formatAtt(resA)}</span></div>
+        <div style="font-size: 0.8rem; color: var(--text-3);"><strong>Time:</strong> ${formatTime(resA)}</div>
+      </div>
+      <div style="flex: 1; border: 1px solid var(--border); border-radius: 4px; padding: 8px;">
+        <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: var(--text-2); display:flex; justify-content:space-between;">
+           <span>B: ${escHtml(nameB)}</span>
+           ${getVerdictBadge(resB)}
+        </div>
+        <div style="font-size: 0.8rem; margin-bottom: 2px;"><strong>Output:</strong> <span style="display:inline-flex; align-items:center;">${formatAtt(resB)}</span></div>
+        <div style="font-size: 0.8rem; color: var(--text-3);"><strong>Time:</strong> ${formatTime(resB)}</div>
+      </div>
+    </div>
+  `;
+  return div;
 }
 
